@@ -396,7 +396,7 @@ class Exp_Main_Test(Exp_Basic):
         del cur_model
 
         return params_answer
-        
+
 
 
     def learn_mapping_model_during_vali(self, is_training_part_params):
@@ -443,7 +443,7 @@ class Exp_Main_Test(Exp_Basic):
             # pred = pred.detach().cpu()
             # true = true.detach().cpu()
 
-            # 每次计算前都要讲梯度先清零
+            # 每次计算前都要将之前的梯度先清零、以避免梯度被累加
             tmp_optim.zero_grad()
             # 计算MSE loss并作backward
             loss = criterion(pred, true)
@@ -461,7 +461,7 @@ class Exp_Main_Test(Exp_Basic):
             train_Y.append(train_Y_sample)
         
 
-        # 一定记得要加int，否则会是浮点型的！！
+        # 一定记得要加int，否则dim会是浮点型的！！
         X_dim = int(train_X[0].shape[0])
         Y_dim = int(train_Y[0].shape[0])
         print(f"X_dim: {X_dim}, Y_dim: {Y_dim}")
@@ -518,8 +518,8 @@ class Exp_Main_Test(Exp_Basic):
         preds = []
         trues = []
 
-        mapping_model = self.learn_mapping_model_during_vali(is_training_part_params)
-        mapping_model.eval()
+        # mapping_model = self.learn_mapping_model_during_vali(is_training_part_params)
+        # mapping_model.eval()
 
         a1, a2, a3 = [], [], []
 
@@ -601,11 +601,11 @@ class Exp_Main_Test(Exp_Basic):
 
             
 
-            tmp_train_X_sample = torch.cat((batch_x[:, -self.args.seq_len:, :], batch_x_mark[:, -self.args.seq_len:, :]), 2).ravel()
-            tmp_train_X_sample = tmp_train_X_sample.to(torch.float32).to(self.device)
-            mapping_answer = mapping_model(tmp_train_X_sample)
-            # mapping_answer = mapping_answer.reshape()
-            # print(mapping_answer)
+            # tmp_train_X_sample = torch.cat((batch_x[:, -self.args.seq_len:, :], batch_x_mark[:, -self.args.seq_len:, :]), 2).ravel()
+            # tmp_train_X_sample = tmp_train_X_sample.to(torch.float32).to(self.device)
+            # mapping_answer = mapping_model(tmp_train_X_sample)
+            # # mapping_answer = mapping_answer.reshape()
+            # # print(mapping_answer)
             
 
             # 先用原模型的预测值和标签值之间的error，做反向传播之后得到的梯度值gradient_0
@@ -613,10 +613,10 @@ class Exp_Main_Test(Exp_Basic):
             # 然后，对测试样本做了adaptation之后，会得到一个gradient_1
             # 那么对gradient_1和gradient_0之间做对比，
             # 就可以得到二者之间的余弦值是多少（方向是否一致），以及长度上相差的距离有多少等等。
-            params_answer = self.get_answer_grad(is_training_part_params, use_adapted_model,
-                                                    lr, test_data, 
-                                                    batch_x, batch_y, batch_x_mark, batch_y_mark,
-                                                    setting)
+            # params_answer = self.get_answer_grad(is_training_part_params, use_adapted_model,
+            #                                         lr, test_data, 
+            #                                         batch_x, batch_y, batch_x_mark, batch_y_mark,
+            #                                         setting)
 
 
             params_adapted = torch.zeros((1)).to(self.device)
@@ -643,6 +643,7 @@ class Exp_Main_Test(Exp_Basic):
 
                 import random
                 is_random = False
+                # is_random = True
                 sample_order_list = list(range(self.test_train_num))
                 # print("before random, sample_order_list is: ", sample_order_list)
                 if is_random:
@@ -673,6 +674,10 @@ class Exp_Main_Test(Exp_Basic):
                         batch_x[:, ii : ii+seq_len, :], batch_x[:, ii+seq_len-label_len : ii+seq_len+pred_len, :], 
                         batch_x_mark[:, ii : ii+seq_len, :], batch_x_mark[:, ii+seq_len-label_len : ii+seq_len+pred_len, :])
 
+                    # 这里当batch_size为1还是32时
+                    # pred和true的size可能为[1, 24, 7]或[32, 24, 7]
+                    # 但是结果的loss值均只包含1个值
+                    # 这是因为criterion为MSELoss，其默认使用mean模式，会对32个loss值取一个平均值
                     loss = criterion(pred, true)
 
                     # from functorch import vmap
@@ -699,26 +704,26 @@ class Exp_Main_Test(Exp_Basic):
                     else:
                         # pass
                         loss.backward()
-                        # model_optim.step()
+                        model_optim.step()
 
-                        w_T = params[0].grad.T
-                        b = params[1].grad.unsqueeze(0)
-                        params_tmp = torch.cat((w_T, b), 0)
-                        params_tmp = params_tmp.ravel()
-                        params_adapted = params_adapted + params_tmp
+                        # w_T = params[0].grad.T
+                        # b = params[1].grad.unsqueeze(0)
+                        # params_tmp = torch.cat((w_T, b), 0)
+                        # params_tmp = params_tmp.ravel()
+                        # params_adapted = params_adapted + params_tmp
 
-                        # 计算标准答案的梯度params_answer和adaptation中的梯度params_tmp之间的角度
-                        import math
-                        # print()
-                        # product = torch.dot(params_tmp, params_answer)
-                        # product = product / (torch.norm(params_tmp) * torch.norm(params_answer))
-                        product = torch.dot(params_tmp, mapping_answer)
-                        product = product / (torch.norm(params_tmp) * torch.norm(mapping_answer))
-                        angel = math.degrees(math.acos(product))
-                        if angel < 90:
-                            model_optim.step()
-                        else:
-                            model_optim.zero_grad()
+                        # # 计算标准答案的梯度params_answer和adaptation中的梯度params_tmp之间的角度
+                        # import math
+                        # # print()
+                        # # product = torch.dot(params_tmp, params_answer)
+                        # # product = product / (torch.norm(params_tmp) * torch.norm(params_answer))
+                        # product = torch.dot(params_tmp, mapping_answer)
+                        # product = product / (torch.norm(params_tmp) * torch.norm(mapping_answer))
+                        # angel = math.degrees(math.acos(product))
+                        # if angel < 90:
+                        #     model_optim.step()
+                        # else:
+                        #     model_optim.zero_grad()
 
 
                         # if pass_num == 0:
@@ -734,6 +739,14 @@ class Exp_Main_Test(Exp_Basic):
                         # model_optim.step()
                         
                         # model_optim_norm.step()
+
+                        w_T = params[0].grad.T  # 先对weight参数做转置
+                        b = params[1].grad.unsqueeze(0)  # 将bias参数扩展一维
+                        params_grad = torch.cat((w_T, b), 0)  # 将w_T和b参数concat起来
+                        params_grad = params_grad.ravel()  # 最后再展开成一维的
+
+                        # with open(f"./logs_loss_and_grad/batch{self.args.adapted_batch_size}_{setting}", "a") as f:
+                        #     f.write(f"{loss}, {torch.norm(params_grad)}" + "\n")
 
                     # cur_model.eval()
                     # tmp_pred, tmp_true = self._process_one_batch_with_model(cur_model, test_data,
@@ -837,7 +850,7 @@ class Exp_Main_Test(Exp_Basic):
                 total_err += tmp_err
                 total_num += 1
             mean_error_per_pred_index[index] = total_err / total_num
-        print(mean_error_per_pred_index)
+        # print(mean_error_per_pred_index)
 
 
         preds = np.array(preds)

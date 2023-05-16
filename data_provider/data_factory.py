@@ -39,7 +39,7 @@ def data_provider(args, flag):
         batch_size = 1
         freq = args.freq
         Data = Dataset_Pred
-    else:
+    else:  # flag == "train" or flga == "val"
         shuffle_flag = True  # 注意：训练集/验证集数据是会随机shuffle的！！
         drop_last = True
         batch_size = args.batch_size
@@ -76,10 +76,12 @@ def data_provider_at_test_time(args, flag):
         freq = args.freq
 
         # 注意：因为我们要做TTT/TTA，所以一定要把batch_size设置成1 ！！！
-        batch_size = 32
+        # batch_size = 32
+        batch_size = args.adapted_batch_size
         # batch_size = 1
         # batch_size = 4
         # batch_size = 2857
+        # batch_size = 256
 
         # Data = Dataset_Custom_Test
         dataset_name = args.data
