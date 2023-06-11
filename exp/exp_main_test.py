@@ -277,11 +277,11 @@ class Exp_Main_Test(Exp_Basic):
                 preds.append(pred)
                 trues.append(true)
 
-                if i % 20 == 0:
-                    input = batch_x.detach().cpu().numpy()
-                    gt = np.concatenate((input[0, :, -1], true[0, :, -1]), axis=0)
-                    pd = np.concatenate((input[0, :, -1], pred[0, :, -1]), axis=0)
-                    visual(gt, pd, os.path.join(folder_path, str(i) + '.pdf'))
+                # if i % 20 == 0:
+                #     input = batch_x.detach().cpu().numpy()
+                #     gt = np.concatenate((input[0, :, -1], true[0, :, -1]), axis=0)
+                #     pd = np.concatenate((input[0, :, -1], pred[0, :, -1]), axis=0)
+                #     visual(gt, pd, os.path.join(folder_path, str(i) + '.pdf'))
         
         # file_name = f"batchsize_32_{setting}" if flag == 'test' else f"batchsize_1_{setting}"
         # # 将adaptation前的loss、adaptation中逐样本做adapt后的loss、以及adaptation之后的loss做统计
@@ -319,7 +319,8 @@ class Exp_Main_Test(Exp_Basic):
 
         print(f"Test - cost time: {time.time() - test_time_start}s")
 
-        return
+        # return
+        return loss_list
 
 
     def get_answer_grad(self, is_training_part_params, use_adapted_model, lr, test_data, batch_x, batch_y, batch_x_mark, batch_y_mark, setting):
@@ -354,9 +355,10 @@ class Exp_Main_Test(Exp_Basic):
             new_lr = lr * 5
             model_optim = optim.SGD(params, lr=new_lr)
         else:
-            self.model.requires_grad_(True)
-            # model_optim = optim.Adam(self.model.parameters(), lr=self.args.learning_rate*10 / (2**self.test_train_num))
-            model_optim = optim.Adam(self.model.parameters(), lr=self.args.learning_rate)
+            cur_model.requires_grad_(True)
+            # model_optim = optim.Adam(cur_model.parameters(), lr=self.args.learning_rate*10 / (2**self.test_train_num))
+            # model_optim = optim.Adam(cur_model.parameters(), lr=self.args.learning_rate)
+            model_optim = optim.SGD(cur_model.parameters(), lr=new_lr)
         
         if use_adapted_model:
             pred, true = self._process_one_batch_with_model(cur_model, test_data,
@@ -506,6 +508,226 @@ class Exp_Main_Test(Exp_Basic):
         return mapping_model
 
 
+    def cal_analytical_solution(self, mid_embedding_list, y_list, weight_list, W_orig):
+        # self.args.lambda_reg = 
+
+        dim = mid_embedding_list[0].shape[-1]  # H+1
+        eye = torch.eye(dim).to(self.device)  # 对角矩阵I
+
+        left = self.args.lambda_reg * eye
+        for ii in range(len(mid_embedding_list)):
+            mid_embedding = mid_embedding_list[ii].unsqueeze(0)  # 1*(H+1)
+            weight = weight_list[ii]
+            left += weight * (mid_embedding.T @ mid_embedding)  # (H+1)*(H+1)
+
+        right = self.args.lambda_reg * W_orig
+        for ii in range(len(mid_embedding_list)):
+            mid_embedding = mid_embedding_list[ii].unsqueeze(0)  # 1*(H+1)
+            y_i = y_list[ii].unsqueeze(0)  # 1*F
+            weight = weight_list[ii]
+            right += weight * (mid_embedding.T @ y_i)
+        
+        return torch.linalg.inv(left) @ right
+        # return torch.linalg.solve(left, right)
+    
+
+    def calc_test(self, setting, test=0, is_training_part_params=True, use_adapted_model=True, test_train_epochs=1):
+        test_data, test_loader = self._get_data_at_test_time(flag='test')
+        if test:
+            print('loading model from checkpoint !!!')
+            self.model.load_state_dict(torch.load(os.path.join('./checkpoints/' + setting, 'checkpoint.pth'), map_location='cuda:0'))
+
+        self.model.eval()
+
+        preds = []
+        trues = []
+
+        a1, a2, a3, a4 = [], [], [], []
+
+        if self.args.use_amp:
+            scaler = torch.cuda.amp.GradScaler()  # 如果使用amp的话，还需要再生成一个scaler？
+
+        criterion = nn.MSELoss()  # 使用MSELoss
+        test_time_start = time.time()
+
+        # self.model.eval()
+        for i, (batch_x, batch_y, batch_x_mark, batch_y_mark) in enumerate(test_loader):
+            # 从self.model拷贝下来cur_model，并设置为train模式
+            self.model.load_state_dict(torch.load(os.path.join('./checkpoints/' + setting, 'checkpoint.pth'), map_location='cuda:0'))
+            cur_model = copy.deepcopy(self.model)
+            # cur_model.train()
+
+            if is_training_part_params:
+                params = []
+                names = []
+                cur_model.requires_grad_(False)
+                for n_m, m in cur_model.named_modules():
+                    # 注意：这里的名字应当根据Autoformer模型而修改为"decoder.projection"
+                    if "decoder.projection" == n_m:
+                        # m.requires_grad_(True)
+                        for n_p, p in m.named_parameters():
+                            if n_p in ['weight', 'bias']:  # weight is scale, bias is shift
+                                params.append(p)
+                                names.append(f"{n_m}.{n_p}")
+            else:
+                cur_model.requires_grad_(True)
+            
+
+            # tmp loss
+            cur_model.eval()
+            pred, true = self._process_one_batch_with_model(cur_model, test_data,
+                batch_x[:, -self.args.seq_len:, :], batch_y, 
+                batch_x_mark[:, -self.args.seq_len:, :], batch_y_mark)
+            # 获取adaptation之前的loss
+            loss_before_adapt = criterion(pred, true)
+            a1.append(loss_before_adapt.item())
+            # print(f"loss_before_adapt: {loss_before_adapt}")
+            # print(f'mse:{tmp_loss}')
+
+            # cur_model.train()
+
+            gradients = []
+
+            mean_loss = 0
+            mid_embedding_list = []
+            weight_list = []
+            y_list = []
+
+            # prepare params for analytical solution
+            for ii in range(self.test_train_num):
+
+                seq_len = self.args.seq_len
+                label_len = self.args.label_len
+                pred_len = self.args.pred_len
+
+                # 获得中间变量mid_embedding等信息
+                pred, true, mid_embedding = self._process_one_batch_with_model(cur_model, test_data,
+                    batch_x[:, ii : ii+seq_len, :], batch_x[:, ii+seq_len-label_len : ii+seq_len+pred_len, :], 
+                    batch_x_mark[:, ii : ii+seq_len, :], batch_x_mark[:, ii+seq_len-label_len : ii+seq_len+pred_len, :],
+                    return_mid_embedding=True)
+
+                mid_embedding = mid_embedding.squeeze(0)  # 1*L*H
+                ones = torch.ones(mid_embedding.shape[-2]).unsqueeze(1).to(self.device)  # 在最后面加入一列1进来
+                mid_embedding = torch.cat((mid_embedding, ones), 1)  # L*(H+1)
+
+                mid_embedding_list.extend(mid_embedding.unbind())  # 包含L项的list，每个形状为(H+1)维
+
+                length = mid_embedding.shape[0]  # 取出L，这L项数据的weight均为：1 / (N - ii)**alpha
+                weights = [(self.test_train_num - ii) ** (-self.args.alpha)] * length
+                weight_list.extend(weights)
+
+                y_value = true.squeeze(0)  # L*F
+                y_value = y_value.float().to(self.device)
+                # y_list.append(true)
+                y_list.extend(y_value.unbind())
+            
+
+            # # calculation a2
+            # for ii in range(self.test_train_num):
+            #     seq_len = self.args.seq_len
+            #     label_len = self.args.label_len
+            #     pred_len = self.args.pred_len
+
+            #     pred, true = self._process_one_batch_with_model(cur_model, test_data,
+            #         batch_x[:, ii : ii+seq_len, :], batch_x[:, ii+seq_len-label_len : ii+seq_len+pred_len, :], 
+            #         batch_x_mark[:, ii : ii+seq_len, :], batch_x_mark[:, ii+seq_len-label_len : ii+seq_len+pred_len, :])
+
+            #     loss = criterion(pred, true)
+            #     mean_loss += loss
+            # mean_loss = mean_loss / self.test_train_num
+            # a2.append(mean_loss.item())
+
+
+            w_T = params[0].T  # H*F
+            b = params[1].unsqueeze(0)
+            W_orig = torch.cat((w_T, b), 0)  # (H+1)*F
+
+            x_0 = torch.stack(mid_embedding_list)  # (N*L), (H+1)
+            y_label = torch.stack(y_list)  # (N*L), F
+            y_pred = x_0 @ W_orig
+            loss_0 = criterion(y_pred, y_label)
+            a2.append(loss_0.item())
+
+            # t0 = time.time()
+            W_adapted = self.cal_analytical_solution(mid_embedding_list, y_list, weight_list, W_orig)
+            # print(f"cal_analytical_solution, time={time.time() - t0}")
+
+            y_pred = x_0 @ W_adapted
+            loss_1 = criterion(y_pred, y_label)
+            a3.append(loss_1.item())
+
+            # print(f"loss_0: {loss_0}, loss_1:{loss_1}")
+
+            w_T_adapted, b_adapted = W_adapted[:-1, :], W_adapted[-1:, :]
+            w_T_adapted = w_T_adapted.T
+            b_adapted = b_adapted.squeeze(0)
+            
+            cur_model.decoder.projection.weight.set_(w_T_adapted)
+            cur_model.decoder.projection.bias.set_(b_adapted)
+            
+            cur_model.eval()
+
+            if use_adapted_model:
+                pred, true = self._process_one_batch_with_model(cur_model, test_data,
+                    batch_x[:, -self.args.seq_len:, :], batch_y, 
+                    batch_x_mark[:, -self.args.seq_len:, :], batch_y_mark)
+            else:
+                # pred, true = self._process_one_batch_with_model(self.model, test_data,
+                #     batch_x[:, -self.args.seq_len:, :], batch_y, 
+                #     batch_x_mark[:, -self.args.seq_len:, :], batch_y_mark)
+                pred, true = self._process_one_batch_with_model(cur_model, test_data,
+                    batch_x[:, -self.args.seq_len:, :], batch_y, 
+                    batch_x_mark[:, -self.args.seq_len:, :], batch_y_mark)
+
+            # 获取adaptation之后的loss
+            loss_after_adapt = criterion(pred, true)
+            a4.append(loss_after_adapt.item())
+
+
+            preds.append(pred.detach().cpu().numpy())
+            trues.append(true.detach().cpu().numpy())
+
+
+            if (i+1) % 100 == 0:
+                print("\titers: {0}, cost time: {1}s".format(i + 1, time.time() - test_time_start))
+                print(gradients)
+                tmp_p = np.array(preds); tmp_p = tmp_p.reshape(-1, tmp_p.shape[-2], tmp_p.shape[-1])
+                tmp_t = np.array(trues); tmp_t = tmp_t.reshape(-1, tmp_t.shape[-2], tmp_t.shape[-1])
+                tmp_mae, tmp_mse, _, _, _ = metric(tmp_p, tmp_t)
+                print('mse:{}, mae:{}'.format(tmp_mse, tmp_mae))
+
+                avg_1, avg_2, avg_3, avg_4 = 0, 0, 0, 0
+                num = len(a1)
+                for iii in range(num):
+                    avg_1 += a1[iii]; avg_2 += a2[iii]; avg_3 += a3[iii]; avg_4 += a4[iii]
+                avg_1 /= num; avg_2 /= num; avg_3 /= num; avg_4 /= num
+                print(avg_1, avg_2, avg_3, avg_4)
+
+            cur_model.eval()
+            # cur_model.cpu()
+            del cur_model
+            torch.cuda.empty_cache()
+
+        preds = np.array(preds)
+        trues = np.array(trues)
+        print('test shape:', preds.shape, trues.shape)
+
+        preds = preds.reshape(-1, preds.shape[-2], preds.shape[-1])
+        trues = trues.reshape(-1, trues.shape[-2], trues.shape[-1])
+        print('test shape:', preds.shape, trues.shape)
+
+        # result save
+        folder_path = './results/' + setting + '/'
+        if not os.path.exists(folder_path):
+            os.makedirs(folder_path)
+
+        mae, mse, rmse, mape, mspe = metric(preds, trues)
+        print('mse:{}, mae:{}'.format(mse, mae))
+
+        print(f"Test - cost time: {time.time() - test_time_start}s")
+
+        return a1, a2, a3
+
 
     def my_test(self, setting, test=0, is_training_part_params=True, use_adapted_model=True, test_train_epochs=1):
         test_data, test_loader = self._get_data_at_test_time(flag='test')
@@ -531,6 +753,25 @@ class Exp_Main_Test(Exp_Basic):
         criterion = nn.MSELoss()  # 使用MSELoss
         test_time_start = time.time()
 
+        def MAE(pred, true):
+            return torch.mean(torch.abs(pred - true))
+        def MSE(pred, true):
+            return torch.mean((pred - true) ** 2)
+        def decay_MSE(pred, true):
+            dim = pred.shape[1]  # 获取L维
+            loss = 0
+            for i in range(dim):
+                loss += (1 / (i+1)) * torch.mean((pred[:,i,:] - true[:,i,:]) ** 2)
+            loss /= dim
+            return loss
+        def decay_MAE(pred, true):
+            dim = pred.shape[1]  # 获取L维
+            loss = 0
+            for i in range(dim):
+                loss += (1 / math.sqrt(i+1)) * torch.mean(torch.abs(pred[:,i,:] - true[:,i,:]))
+            loss /= dim
+            return loss
+
         # # result save
         # folder_path = './test_results/' + setting + '/'
         # if not os.path.exists(folder_path):
@@ -539,6 +780,7 @@ class Exp_Main_Test(Exp_Basic):
         # self.model.eval()
         for i, (batch_x, batch_y, batch_x_mark, batch_y_mark) in enumerate(test_loader):
             # 从self.model拷贝下来cur_model，并设置为train模式
+            self.model.load_state_dict(torch.load(os.path.join('./checkpoints/' + setting, 'checkpoint.pth'), map_location='cuda:0'))
             cur_model = copy.deepcopy(self.model)
             cur_model.train()
 
@@ -582,9 +824,11 @@ class Exp_Main_Test(Exp_Basic):
                 # 普通的SGD优化器？
                 model_optim = optim.SGD(params, lr=lr)
             else:
-                self.model.requires_grad_(True)
-                # model_optim = optim.Adam(self.model.parameters(), lr=self.args.learning_rate*10 / (2**self.test_train_num))
-                model_optim = optim.Adam(self.model.parameters(), lr=self.args.learning_rate)
+                cur_model.requires_grad_(True)
+                # model_optim = optim.Adam(cur_model.parameters(), lr=self.args.learning_rate*10 / (2**self.test_train_num))
+                # model_optim = optim.Adam(cur_model.parameters(), lr=self.args.learning_rate)
+                lr = self.args.learning_rate * self.args.adapted_lr_times
+                model_optim = optim.SGD(cur_model.parameters(), lr=lr)
             
 
             # tmp loss
@@ -653,7 +897,25 @@ class Exp_Main_Test(Exp_Basic):
                     # print("do not use random.")
                     pass
 
+                # 新加了参数num_of_loss_per_update，表示我们将多个loss平均起来做一次更新
+                num_of_loss_per_update = self.test_train_num
+                # num_of_loss_per_update = 1
                 mean_loss = 0
+
+
+                # # 验证adaptation结果
+                # pred, true = self._process_one_batch_with_model(cur_model, test_data,
+                #     batch_x[:, -self.args.seq_len:, :], batch_y, 
+                #     batch_x_mark[:, -self.args.seq_len:, :], batch_y_mark)
+                
+                # loss = criterion(pred, true)
+                # mean_loss += loss
+
+                # loss.backward()
+                # model_optim.step()
+
+
+
                 for ii in sample_order_list:
                     # if pass_num == 1 and ii not in accpted_samples_num:
                     #     continue
@@ -678,7 +940,9 @@ class Exp_Main_Test(Exp_Basic):
                     # pred和true的size可能为[1, 24, 7]或[32, 24, 7]
                     # 但是结果的loss值均只包含1个值
                     # 这是因为criterion为MSELoss，其默认使用mean模式，会对32个loss值取一个平均值
-                    loss = criterion(pred, true)
+                    
+                    # loss = criterion(pred, true)
+                    loss = decay_MAE(pred, true)
 
                     # from functorch import vmap
                     # from functorch.experimental import replace_all_batch_norm_modules_
@@ -694,7 +958,7 @@ class Exp_Main_Test(Exp_Basic):
 
 
                     # loss = criterion(pred, true)
-                    # mean_loss += loss
+                    mean_loss += loss
 
                     if self.args.use_amp:
                         scaler.scale(loss).backward()
@@ -705,6 +969,20 @@ class Exp_Main_Test(Exp_Basic):
                         # pass
                         loss.backward()
                         model_optim.step()
+
+                        # # 多个损失合并起来做一次更新
+                        # if (ii+1) % num_of_loss_per_update == 0:
+                        #     mean_loss = mean_loss / num_of_loss_per_update
+                        #     mean_loss.backward()
+                        #     model_optim.step()
+                        #     mean_loss = 0
+                        # elif (ii+1) == len(sample_order_list):
+                        #     mean_loss = mean_loss / (len(sample_order_list) % num_of_loss_per_update)
+                        #     mean_loss.backward()
+                        #     model_optim.step()
+                        #     mean_loss = 0
+                        # else:
+                        #     pass
 
                         # w_T = params[0].grad.T
                         # b = params[1].grad.unsqueeze(0)
@@ -740,10 +1018,10 @@ class Exp_Main_Test(Exp_Basic):
                         
                         # model_optim_norm.step()
 
-                        w_T = params[0].grad.T  # 先对weight参数做转置
-                        b = params[1].grad.unsqueeze(0)  # 将bias参数扩展一维
-                        params_grad = torch.cat((w_T, b), 0)  # 将w_T和b参数concat起来
-                        params_grad = params_grad.ravel()  # 最后再展开成一维的
+                        # w_T = params[0].grad.T  # 先对weight参数做转置
+                        # b = params[1].grad.unsqueeze(0)  # 将bias参数扩展一维
+                        # params_grad = torch.cat((w_T, b), 0)  # 将w_T和b参数concat起来
+                        # params_grad = params_grad.ravel()  # 最后再展开成一维的
 
                         # with open(f"./logs_loss_and_grad/batch{self.args.adapted_batch_size}_{setting}", "a") as f:
                         #     f.write(f"{loss}, {torch.norm(params_grad)}" + "\n")
@@ -757,7 +1035,7 @@ class Exp_Main_Test(Exp_Basic):
 
                     # 记录逐样本做了adaptation之后的loss
                     # mean_loss += tmp_loss
-                    mean_loss += loss
+                    # mean_loss += loss
 
 
                     # cur_lr = cur_lr * 2
@@ -768,11 +1046,12 @@ class Exp_Main_Test(Exp_Basic):
                     # for param_group in model_optim_norm.param_groups:
                     #     param_group['lr'] = cur_lr_norm
                 
-                mean_loss = mean_loss / self.test_train_num
-                a2.append(mean_loss.item())
-                
-                # mean_loss.backward()
-                # model_optim.step()
+
+            mean_loss = mean_loss / self.test_train_num
+            a2.append(mean_loss.item())
+            
+            # mean_loss.backward()
+            # model_optim.step()
             
             cur_model.eval()
 
@@ -793,7 +1072,10 @@ class Exp_Main_Test(Exp_Basic):
                     batch_x[:, -self.args.seq_len:, :], batch_y, 
                     batch_x_mark[:, -self.args.seq_len:, :], batch_y_mark)
             else:
-                pred, true = self._process_one_batch_with_model(self.model, test_data,
+                # pred, true = self._process_one_batch_with_model(self.model, test_data,
+                #     batch_x[:, -self.args.seq_len:, :], batch_y, 
+                #     batch_x_mark[:, -self.args.seq_len:, :], batch_y_mark)
+                pred, true = self._process_one_batch_with_model(cur_model, test_data,
                     batch_x[:, -self.args.seq_len:, :], batch_y, 
                     batch_x_mark[:, -self.args.seq_len:, :], batch_y_mark)
 
@@ -806,6 +1088,7 @@ class Exp_Main_Test(Exp_Basic):
             trues.append(true.detach().cpu().numpy())
 
             # 对预测结果（如长度为24）中的每个位置/index上的结果分别进行统计
+            pred_len = self.args.pred_len
             for index in range(pred_len):
                 cur_pred = pred.detach().cpu().numpy()[0][index]
                 cur_true = true.detach().cpu().numpy()[0][index]
@@ -820,6 +1103,13 @@ class Exp_Main_Test(Exp_Basic):
                 tmp_t = np.array(trues); tmp_t = tmp_t.reshape(-1, tmp_t.shape[-2], tmp_t.shape[-1])
                 tmp_mae, tmp_mse, _, _, _ = metric(tmp_p, tmp_t)
                 print('mse:{}, mae:{}'.format(tmp_mse, tmp_mae))
+                
+                avg_1, avg_2, avg_3 = 0, 0, 0
+                num = len(a1)
+                for iii in range(num):
+                    avg_1 += a1[iii]; avg_2 += a2[iii]; avg_3 += a3[iii]
+                avg_1 /= num; avg_2 /= num; avg_3 /= num
+                print(avg_1, avg_2, avg_3)
 
             # if i % 20 == 0:
             #     input = batch_x.detach().cpu().numpy()
@@ -882,7 +1172,7 @@ class Exp_Main_Test(Exp_Basic):
 
         print(f"Test - cost time: {time.time() - test_time_start}s")
 
-        return
+        return a1, a2, a3
 
 
 
@@ -902,7 +1192,7 @@ class Exp_Main_Test(Exp_Basic):
     #       
 
 
-    def _process_one_batch_with_model(self, model, dataset_object, batch_x, batch_y, batch_x_mark, batch_y_mark):
+    def _process_one_batch_with_model(self, model, dataset_object, batch_x, batch_y, batch_x_mark, batch_y_mark, return_mid_embedding=False):
         batch_x = batch_x.float().to(self.device)
         batch_y = batch_y.float()
 
@@ -924,7 +1214,10 @@ class Exp_Main_Test(Exp_Basic):
             if self.args.output_attention:
                 outputs = model(batch_x, batch_x_mark, dec_inp, batch_y_mark)[0]
             else:
-                outputs = model(batch_x, batch_x_mark, dec_inp, batch_y_mark)  # 这里返回的结果为[B, L, D]，例如[32, 24, 12]
+                if return_mid_embedding:
+                    outputs, mid_embedding = model(batch_x, batch_x_mark, dec_inp, batch_y_mark, return_mid_embedding, return_mid_embedding=True)  # 这里返回的结果为[B, L, D]，例如[32, 24, 12]
+                else:
+                    outputs = model(batch_x, batch_x_mark, dec_inp, batch_y_mark)  # 这里返回的结果为[B, L, D]，例如[32, 24, 12]
         
         # if self.args.inverse:
         #     outputs = dataset_object.inverse_transform(outputs)
@@ -935,7 +1228,10 @@ class Exp_Main_Test(Exp_Basic):
         batch_y = batch_y[:, -self.args.pred_len:, f_dim:].to(self.device)
 
         # outputs为我们预测出的值pred，而batch_y则是对应的真实值true
-        return outputs, batch_y
+        if return_mid_embedding:
+            return outputs, batch_y, mid_embedding
+        else:
+            return outputs, batch_y
 
 
     def predict(self, setting, load=False):

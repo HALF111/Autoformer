@@ -33,6 +33,18 @@ def data_provider(args, flag):
         drop_last = True  # 设置成True还是False？
         batch_size = 1
         freq=args.freq
+    elif flag == "train_without_shuffle":
+        flag = "train"
+        shuffle_flag = False  # 为了做KNN的时候保持训练集中顺序，故而设成False
+        drop_last = True  # 设置成True还是False？
+        batch_size = args.batch_size
+        freq=args.freq
+    elif flag == "val_without_shuffle":
+        flag = "val"
+        shuffle_flag = False  # 为了做KNN的时候保持训练集中顺序，故而设成False
+        drop_last = True  # 设置成True还是False？
+        batch_size = args.batch_size
+        freq=args.freq
     elif flag == 'pred':
         shuffle_flag = False
         drop_last = False

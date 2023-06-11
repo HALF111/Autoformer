@@ -585,6 +585,13 @@ class Dataset_ETT_hour_Test(Dataset):
         self.data_stamp = data_stamp
 
     def __getitem__(self, index):
+        # # 改成把s_begin往左移
+        # # s_begin = index
+        # s_begin = index - (self.pred_len + self.test_train_num - 1)
+        # s_end = index + self.seq_len
+        # r_begin = s_end - self.label_len
+        # r_end = r_begin + self.label_len + self.pred_len
+
         s_begin = index
         # s_end = s_begin + self.seq_len
         # 注意这里要做一些修改！！！
@@ -604,7 +611,9 @@ class Dataset_ETT_hour_Test(Dataset):
         # return len(self.data_x) - self.seq_len - self.pred_len + 1
         # 注意：这里的__len__也需要做修改！！！
         # 不然取数据的时候会超出范围
-        return len(self.data_x) - (self.seq_len + self.pred_len + self.test_train_num - 1) - self.pred_len + 1
+        # return len(self.data_x) - (self.seq_len + self.pred_len + self.test_train_num - 1) - self.pred_len + 1
+        return (len(self.data_x) - (self.pred_len + self.test_train_num - 1)) - self.seq_len - self.pred_len + 1
+    
 
     def inverse_transform(self, data):
         return self.scaler.inverse_transform(data)
@@ -707,7 +716,8 @@ class Dataset_ETT_minute_Test(Dataset):
         # return len(self.data_x) - self.seq_len - self.pred_len + 1
         # 注意：这里的__len__也需要做修改！！！
         # 不然取数据的时候会超出范围
-        return len(self.data_x) - (self.seq_len + self.pred_len + self.test_train_num - 1) - self.pred_len + 1
+        # return len(self.data_x) - (self.seq_len + self.pred_len + self.test_train_num - 1) - self.pred_len + 1
+        return (len(self.data_x) - (self.pred_len + self.test_train_num - 1)) - self.seq_len - self.pred_len + 1
 
     def inverse_transform(self, data):
         return self.scaler.inverse_transform(data)

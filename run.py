@@ -81,10 +81,18 @@ def main():
     # test_train_num
     parser.add_argument('--test_train_num', type=int, default=10, help='how many samples to be trained during test')
     parser.add_argument('--adapted_lr_times', type=float, default=1, help='the times of lr during adapted')  # adaptation时的lr是原来的lr的几倍？
-    parser.add_argument('--adapted_batch_size', type=int, default=32, help='the batch_size for adaptation use')  # adaptation时的数据集取的batch_size设置为多大
+    parser.add_argument('--adapted_batch_size', type=int, default=1, help='the batch_size for adaptation use')  # adaptation时的数据集取的batch_size设置为多大
     parser.add_argument('--test_train_epochs', type=int, default=1, help='the batch_size for adaptation use')  # adaptation时的数据集取的batch_size设置为多大
     parser.add_argument('--run_train', action='store_true')
     parser.add_argument('--run_test', action='store_true')
+    parser.add_argument('--run_adapt', action='store_true')
+    parser.add_argument('--run_calc', action='store_true')
+    parser.add_argument('--lambda_reg', type=float, default=1)
+    parser.add_argument('--alpha', type=float, default=1)
+
+    # KNN
+    parser.add_argument('--feature_dim', type=int, default=50)
+    parser.add_argument('--k_value', type=int, default=10)
 
     args = parser.parse_args()
 
@@ -142,18 +150,22 @@ def main():
             # # exp.test(setting, flag="test_with_batchsize_1")
             # exp.test(setting, test=1, flag="test_with_batchsize_1")
 
+            if args.run_adapt:
+                # # 对整个模型进行fine-tuning
+                # print('>>>>>>>my testing with all parameters trained : {}<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<'.format(setting))
+                # exp.my_test(setting, test=1, is_training_part_params=False, use_adapted_model=True, test_train_epochs=args.test_train_epochs)
 
-            # # 对整个模型进行fine-tuning
-            # print('>>>>>>>my testing with all parameters trained : {}<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<'.format(setting))
-            # exp.my_test(setting, is_training_part_params=False, use_adapted_model=True, test_train_epochs=3)
 
-            # 只对最后的全连接层projection层进行fine-tuning
-            print('>>>>>>>my testing with test-time training : {}<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<'.format(setting))
-            # exp.my_test(setting, is_training_part_params=True, use_adapted_model=True, test_train_epochs=1)
-            exp.my_test(setting, test=1, is_training_part_params=True, use_adapted_model=True, test_train_epochs=args.test_train_epochs)
+                # 只对最后的全连接层projection层进行fine-tuning
+                print('>>>>>>>my testing with test-time training : {}<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<'.format(setting))
+                # exp.my_test(setting, is_training_part_params=True, use_adapted_model=True, test_train_epochs=1)
+                exp.my_test(setting, test=1, is_training_part_params=True, use_adapted_model=True, test_train_epochs=args.test_train_epochs)
 
-            # exp.my_test_mp(setting, is_training_part_params=True, use_adapted_model=True, test_train_epochs=1)
-
+                # exp.my_test_mp(setting, is_training_part_params=True, use_adapted_model=True, test_train_epochs=1)
+            
+            if args.run_calc:
+                print('>>>>>>>run_calc test with test-time training : {}<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<'.format(setting))
+                exp.calc_test(setting, test=1, is_training_part_params=True, use_adapted_model=True, test_train_epochs=args.test_train_epochs)
 
             # print('>>>>>>>my testing but with original model : {}<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<'.format(setting))
             # exp.my_test(setting, is_training_part_params=True, use_adapted_model=False)

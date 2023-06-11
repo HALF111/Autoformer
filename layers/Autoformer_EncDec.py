@@ -160,14 +160,27 @@ class Decoder(nn.Module):
         self.norm = norm_layer
         self.projection = projection
 
-    def forward(self, x, cross, x_mask=None, cross_mask=None, trend=None):
+    def forward(self, x, cross, x_mask=None, cross_mask=None, trend=None, return_mid_embedding=False):
         for layer in self.layers:
             x, residual_trend = layer(x, cross, x_mask=x_mask, cross_mask=cross_mask)
             trend = trend + residual_trend
 
+        # 过layer_norm层
         if self.norm is not None:
             x = self.norm(x)
+        
+        if return_mid_embedding:
+            import copy
+            mid_embedding=copy.deepcopy(x)
 
+        # 过线性的projection层
         if self.projection is not None:
             x = self.projection(x)
-        return x, trend
+        
+        if return_mid_embedding:
+            return x, trend, mid_embedding
+        else:
+            return x, trend
+        
+        # # original return
+        # return x, trend
