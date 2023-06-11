@@ -554,7 +554,8 @@ class Exp_Main_Test(Exp_Basic):
         for i, (batch_x, batch_y, batch_x_mark, batch_y_mark) in enumerate(test_loader):
             # 从self.model拷贝下来cur_model，并设置为train模式
             self.model.load_state_dict(torch.load(os.path.join('./checkpoints/' + setting, 'checkpoint.pth'), map_location='cuda:0'))
-            cur_model = copy.deepcopy(self.model)
+            cur_model = self.model
+            # cur_model = copy.deepcopy(self.model)
             # cur_model.train()
 
             if is_training_part_params:
@@ -593,20 +594,43 @@ class Exp_Main_Test(Exp_Basic):
             weight_list = []
             y_list = []
 
+            seq_len = self.args.seq_len
+            label_len = self.args.label_len
+            pred_len = self.args.pred_len
+
+            x_stacked_list, y_stacked_list, x_mark_stacked_list, y_mark_stacked_list = [], [], [], []
+
             # prepare params for analytical solution
             for ii in range(self.test_train_num):
+                x_stacked_list.append(batch_x[:, ii : ii+seq_len, :].squeeze(0))
+                y_stacked_list.append(batch_x[:, ii+seq_len-label_len : ii+seq_len+pred_len, :].squeeze(0))
+                x_mark_stacked_list.append(batch_x_mark[:, ii : ii+seq_len, :].squeeze(0))
+                y_mark_stacked_list.append(batch_x_mark[:, ii+seq_len-label_len : ii+seq_len+pred_len, :].squeeze(0))
 
-                seq_len = self.args.seq_len
-                label_len = self.args.label_len
-                pred_len = self.args.pred_len
+            # x_stacked维度为(ttn, seq_len, F)
+            x_stacked, y_stacked = torch.stack(x_stacked_list), torch.stack(y_stacked_list)
+            x_mark_stacked, y_mark_stacked = torch.stack(x_mark_stacked_list), torch.stack(y_mark_stacked_list)
 
-                # 获得中间变量mid_embedding等信息
-                pred, true, mid_embedding = self._process_one_batch_with_model(cur_model, test_data,
-                    batch_x[:, ii : ii+seq_len, :], batch_x[:, ii+seq_len-label_len : ii+seq_len+pred_len, :], 
-                    batch_x_mark[:, ii : ii+seq_len, :], batch_x_mark[:, ii+seq_len-label_len : ii+seq_len+pred_len, :],
-                    return_mid_embedding=True)
 
-                mid_embedding = mid_embedding.squeeze(0)  # 1*L*H
+            # 获得中间变量mid_embedding等信息
+            # 并行化后，pred和true的维度为(ttn, pred_len, F)，mid_embedding的维度为(ttn, pred_len, mid_dim)
+            pred, true, all_mid_embedding = self._process_one_batch_with_model(cur_model, test_data,
+                x_stacked, y_stacked, 
+                x_mark_stacked, y_mark_stacked,
+                return_mid_embedding=True)
+
+            # # 获得中间变量mid_embedding等信息
+            # pred, true, mid_embedding = self._process_one_batch_with_model(cur_model, test_data,
+            #     batch_x[:, ii : ii+seq_len, :], batch_x[:, ii+seq_len-label_len : ii+seq_len+pred_len, :], 
+            #     batch_x_mark[:, ii : ii+seq_len, :], batch_x_mark[:, ii+seq_len-label_len : ii+seq_len+pred_len, :],
+            #     return_mid_embedding=True)
+
+
+            # 并行化计算完后再将mid_embedding拆出来
+            for ii in range(self.test_train_num):
+                # mid_embedding = mid_embedding.squeeze(0)  # L*H
+                mid_embedding = all_mid_embedding[ii]  # L*H，注意这里要取出all_mid_embedding的第ii维
+
                 ones = torch.ones(mid_embedding.shape[-2]).unsqueeze(1).to(self.device)  # 在最后面加入一列1进来
                 mid_embedding = torch.cat((mid_embedding, ones), 1)  # L*(H+1)
 
@@ -616,7 +640,8 @@ class Exp_Main_Test(Exp_Basic):
                 weights = [(self.test_train_num - ii) ** (-self.args.alpha)] * length
                 weight_list.extend(weights)
 
-                y_value = true.squeeze(0)  # L*F
+                # y_value = true.squeeze(0)  # L*F
+                y_value = true[ii]  # L*F，注意这里也要取出true的第ii维
                 y_value = y_value.float().to(self.device)
                 # y_list.append(true)
                 y_list.extend(y_value.unbind())
@@ -705,7 +730,7 @@ class Exp_Main_Test(Exp_Basic):
 
             cur_model.eval()
             # cur_model.cpu()
-            del cur_model
+            # del cur_model
             torch.cuda.empty_cache()
 
         preds = np.array(preds)
