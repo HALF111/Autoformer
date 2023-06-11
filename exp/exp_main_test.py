@@ -514,21 +514,39 @@ class Exp_Main_Test(Exp_Basic):
         dim = mid_embedding_list[0].shape[-1]  # H+1
         eye = torch.eye(dim).to(self.device)  # 对角矩阵I
 
-        left = self.args.lambda_reg * eye
-        for ii in range(len(mid_embedding_list)):
-            mid_embedding = mid_embedding_list[ii].unsqueeze(0)  # 1*(H+1)
-            weight = weight_list[ii]
-            left += weight * (mid_embedding.T @ mid_embedding)  # (H+1)*(H+1)
+        # left = self.args.lambda_reg * eye
+        # for ii in range(len(mid_embedding_list)):
+        #     mid_embedding = mid_embedding_list[ii].unsqueeze(0)  # 1*(H+1)
+        #     weight = weight_list[ii]
+        #     left += weight * (mid_embedding.T @ mid_embedding)  # (H+1)*(H+1)
 
+        # right = self.args.lambda_reg * W_orig
+        # for ii in range(len(mid_embedding_list)):
+        #     mid_embedding = mid_embedding_list[ii].unsqueeze(0)  # 1*(H+1)
+        #     y_i = y_list[ii].unsqueeze(0)  # 1*F
+        #     weight = weight_list[ii]
+        #     right += weight * (mid_embedding.T @ y_i)  # (H+1)*F
+
+        left = self.args.lambda_reg * eye
         right = self.args.lambda_reg * W_orig
-        for ii in range(len(mid_embedding_list)):
-            mid_embedding = mid_embedding_list[ii].unsqueeze(0)  # 1*(H+1)
-            y_i = y_list[ii].unsqueeze(0)  # 1*F
-            weight = weight_list[ii]
-            right += weight * (mid_embedding.T @ y_i)
         
-        return torch.linalg.inv(left) @ right
-        # return torch.linalg.solve(left, right)
+        # 先将X中均乘以weight_list中的权重值
+        weighted_mid_embedding_list = []
+        for ii in range(len(mid_embedding_list)):
+            weighted_mid_embedding_list.append(mid_embedding_list[ii] * weight_list[ii])
+
+        weighted_mid_embedding = torch.stack(weighted_mid_embedding_list)
+        mid_embedding = torch.stack(mid_embedding_list)
+        y_matrix = torch.stack(y_list)
+        
+        # left
+        left += weighted_mid_embedding.T @ mid_embedding
+
+        # right
+        right += weighted_mid_embedding.T @ y_matrix
+        
+        # return torch.linalg.inv(left) @ right  # (H+1)*F
+        return torch.linalg.solve(left, right)  # (H+1)*F
     
 
     def calc_test(self, setting, test=0, is_training_part_params=True, use_adapted_model=True, test_train_epochs=1):
@@ -550,29 +568,44 @@ class Exp_Main_Test(Exp_Basic):
         criterion = nn.MSELoss()  # 使用MSELoss
         test_time_start = time.time()
 
+
+        cur_model = self.model
+        if is_training_part_params:
+            params = []
+            names = []
+            cur_model.requires_grad_(False)
+            for n_m, m in cur_model.named_modules():
+                # 注意：这里的名字应当根据Autoformer模型而修改为"decoder.projection"
+                if "decoder.projection" == n_m:
+                    # m.requires_grad_(True)
+                    for n_p, p in m.named_parameters():
+                        if n_p in ['weight', 'bias']:  # weight is scale, bias is shift
+                            params.append(p)
+                            names.append(f"{n_m}.{n_p}")
+        else:
+            # cur_model.requires_grad_(True)
+            pass
+        
+        # 将原始的w_original和b_original记录下来
+        # w_original = params[0].detach()  # F*H
+        # b_original = params[1].detach()
+        w_original = copy.deepcopy(params[0])  # F*H
+        b_original = copy.deepcopy(params[1])
+
+
         # self.model.eval()
         for i, (batch_x, batch_y, batch_x_mark, batch_y_mark) in enumerate(test_loader):
-            # 从self.model拷贝下来cur_model，并设置为train模式
-            self.model.load_state_dict(torch.load(os.path.join('./checkpoints/' + setting, 'checkpoint.pth'), map_location='cuda:0'))
-            cur_model = self.model
+            # # 从self.model拷贝下来cur_model，并设置为train模式
+            # self.model.load_state_dict(torch.load(os.path.join('./checkpoints/' + setting, 'checkpoint.pth'), map_location='cuda:0'))
+            # cur_model = self.model
             # cur_model = copy.deepcopy(self.model)
-            # cur_model.train()
+            # # cur_model.train()
 
-            if is_training_part_params:
-                params = []
-                names = []
-                cur_model.requires_grad_(False)
-                for n_m, m in cur_model.named_modules():
-                    # 注意：这里的名字应当根据Autoformer模型而修改为"decoder.projection"
-                    if "decoder.projection" == n_m:
-                        # m.requires_grad_(True)
-                        for n_p, p in m.named_parameters():
-                            if n_p in ['weight', 'bias']:  # weight is scale, bias is shift
-                                params.append(p)
-                                names.append(f"{n_m}.{n_p}")
-            else:
-                cur_model.requires_grad_(True)
-            
+            # 每次loada的时候只load了w_original和b_original，无需load整个模型的参数，也无需做磁盘io了
+            cur_model = self.model
+            cur_model.decoder.projection.weight.set_(w_original)
+            cur_model.decoder.projection.bias.set_(b_original)
+
 
             # tmp loss
             cur_model.eval()
@@ -663,8 +696,13 @@ class Exp_Main_Test(Exp_Basic):
             # a2.append(mean_loss.item())
 
 
-            w_T = params[0].T  # H*F
-            b = params[1].unsqueeze(0)
+            # w_T = params[0].T  # H*F
+            # b = params[1].unsqueeze(0)
+
+            # 改成从w_original和b_original中加载w和b的参数
+            w_T = w_original.T  # H*F
+            b = b_original.unsqueeze(0)
+            
             W_orig = torch.cat((w_T, b), 0)  # (H+1)*F
 
             x_0 = torch.stack(mid_embedding_list)  # (N*L), (H+1)
