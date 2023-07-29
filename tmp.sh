@@ -25,3 +25,22 @@ python -u draw_error.py   --is_training 1   --root_path ./dataset/weather/   --d
 
 # 07.Illness
 python -u draw_error.py   --is_training 1   --root_path ./dataset/illness/   --data_path national_illness.csv   --model_id ili_36_24   --model Autoformer   --data custom   --features M   --seq_len 36   --label_len 18   --pred_len 24   --e_layers 2   --d_layers 1   --factor 3   --enc_in 7   --dec_in 7   --c_out 7   --des 'Exp'   --itr 1   --gpu 1  --test_train_num 10 --adapted_lr_times 100 --batch_size 1  --run_adapt --figure_name ILI
+
+
+
+# synthetic
+python -u run.py   --is_training 1   --root_path ./dataset/synthetic/   --data_path data_period_rise.csv   --model_id period_rise_96_96   --model Autoformer   --data custom   --features S   --seq_len 96   --label_len 48   --pred_len 96   --e_layers 2   --d_layers 1   --factor 3   --enc_in 1   --dec_in 1   --c_out 1   --des 'Exp'   --itr 1   --gpu 2  --run_train --run_test
+python -u run.py   --is_training 1   --root_path ./dataset/synthetic/   --data_path data_period_rise.csv   --model_id period_rise_96_96   --model Autoformer   --data custom   --features S   --seq_len 96   --label_len 48   --pred_len 96   --e_layers 2   --d_layers 1   --factor 3   --enc_in 1   --dec_in 1   --c_out 1   --des 'Exp'   --itr 1   --gpu 2  --test_train_num 10 --lambda_reg 100000 --alpha 1 --run_calc
+
+
+# Cryptos
+# BTC_4_hour & M
+python -u run.py  --is_training 1   --root_path ./dataset/KNF/Cryptos/   --data_path BTC_4_hour.csv   --model_id BTC_4_Hour_96_96   --model Autoformer   --data custom   --features M   --seq_len 96   --label_len 48   --pred_len 96   --e_layers 2   --d_layers 1   --factor 3  --enc_in 8   --dec_in 8   --c_out 8   --des 'Exp'   --itr 1   --gpu 0 --test_train_num 10 --lambda_reg 100000 --alpha 1 --run_train --run_test --run_calc
+# BTC_4_hour & MS
+python -u run.py  --is_training 1   --root_path ./dataset/KNF/Cryptos/   --data_path BTC_4_hour.csv   --model_id BTC_4_Hour_96_96   --model Autoformer   --data custom   --features MS   --seq_len 96   --label_len 48   --pred_len 96   --e_layers 2   --d_layers 1   --factor 3  --enc_in 8   --dec_in 8   --c_out 1   --des 'Exp'   --itr 1   --gpu 0 --test_train_num 10 --lambda_reg 100000 --alpha 1 --run_train --run_test --run_calc
+
+
+# Autoformer_extend
+python -u run.py   --is_training 1   --root_path ./dataset/ETT-small/   --data_path ETTh1.csv   --model_id ETTh1_96_96   --model Autoformer_extend   --data ETTh1   --features M   --seq_len 96   --label_len 48   --pred_len 96   --e_layers 2   --d_layers 1   --factor 3   --enc_in 7   --dec_in 7   --c_out 7   --des 'Exp'   --itr 1   --gpu 0 --run_train --run_test
+python -u run.py   --is_training 1   --root_path ./dataset/ETT-small/   --data_path ETTh1.csv   --model_id ETTh1_96_96   --model Autoformer_extend   --data ETTh1   --features M   --seq_len 96   --label_len 48   --pred_len 96   --e_layers 2   --d_layers 1   --factor 3   --enc_in 7   --dec_in 7   --c_out 7   --des 'Exp'   --itr 1   --test_train_num 10 --lambda_reg 1000000 --alpha 1  --gpu 0 --run_calc
+python -u run.py   --is_training 1   --root_path ./dataset/ETT-small/   --data_path ETTh1.csv   --model_id ETTh1_96_96   --model Autoformer_extend   --data ETTh1   --features M   --seq_len 96   --label_len 48   --pred_len 96   --e_layers 2   --d_layers 1   --factor 3   --enc_in 7   --dec_in 7   --c_out 7   --des 'Exp'   --itr 1   --test_train_num 10 --adapted_lr_times 10  --gpu 0 --run_adapt

@@ -1,0 +1,13 @@
+# config.yml
+target:
+  - mse
+group_by:
+  - dataset
+  - alpha
+  - test_train_num
+  - lambda_reg
+where:
+  # - param_dataset: 'ECL'
+  - param_model: 'Autoformer'
+ignore:
+  - gpu

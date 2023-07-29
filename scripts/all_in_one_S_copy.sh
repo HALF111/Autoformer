@@ -1,5 +1,6 @@
-gpu_num=0
+# gpu_num=0
 # gpu_num=1
+gpu_num=3
 
 dir_name=all_result_S_batch1
 # dir_name=all_result_S_batch1_average_loss
@@ -145,9 +146,11 @@ if [ ! -d $cur_path ]; then
     mkdir $cur_path
 fi
 # run train and test first
-python -u run.py   --is_training 1   --root_path ./dataset/weather/   --data_path weather.csv   --model_id weather_96_$pred_len   --model Autoformer   --data custom   --features S   --seq_len 96   --label_len 48   --pred_len $pred_len   --e_layers 2   --d_layers 1   --factor 3   --enc_in 1   --dec_in 1   --c_out 1   --des 'Exp'   --itr 1   --train_epochs 2   --gpu $gpu_num --run_train --run_test > $cur_path'/'train_and_test_loss.log
+# python -u run.py   --is_training 1   --root_path ./dataset/weather/   --data_path weather.csv   --model_id weather_96_$pred_len   --model Autoformer   --data custom   --features S   --seq_len 96   --label_len 48   --pred_len $pred_len   --e_layers 2   --d_layers 1   --factor 3   --enc_in 1   --dec_in 1   --c_out 1   --des 'Exp'   --itr 1   --train_epochs 2   --gpu $gpu_num --run_train --run_test > $cur_path'/'train_and_test_loss.log
+# python -u run.py   --is_training 1   --root_path ./dataset/weather/   --data_path weather.csv   --model_id weather_96_$pred_len   --model Autoformer   --data custom   --features S   --seq_len 96   --label_len 48   --pred_len $pred_len   --e_layers 2   --d_layers 1   --factor 3   --enc_in 1   --dec_in 1   --c_out 1   --des 'Exp'   --itr 1    --gpu $gpu_num --run_train --run_test > $cur_path'/'train_and_test_loss.log
 
 for test_train_num in 10 20
+# for test_train_num in 20
 do
 for adapted_lr_times in 1 5 10 30
 do

@@ -133,3 +133,12 @@ dmypy.json
 /dataset
 /results
 /test_results
+
+
+*.npz
+*.npy
+
+
+/.tune
+# *.png
+# *.pdf

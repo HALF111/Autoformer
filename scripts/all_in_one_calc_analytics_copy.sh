@@ -8,8 +8,8 @@ gpu_num=1
 # dir_name=all_result_batch1_whole_model
 # dir_name=all_result_test_train_epochs
 # dir_name=all_result_cheated
-# dir_name=all_result_calc_analytics
-dir_name=all_result_calc_decay_MSE
+dir_name=all_result_calc_analytics
+# dir_name=all_result_calc_decay_MSE
 
 
 # # 1.ETTh1数据集
@@ -180,13 +180,18 @@ fi
 # run only test first
 python -u run.py   --is_training 1   --root_path ./dataset/traffic/   --data_path traffic.csv   --model_id traffic_96_$pred_len   --model Autoformer   --data custom   --features M   --seq_len 96   --label_len 48   --pred_len $pred_len   --e_layers 2   --d_layers 1   --factor 3   --enc_in 862   --dec_in 862   --c_out 862   --des 'Exp'   --itr 1   --train_epochs 3   --gpu $gpu_num  --run_test > $cur_path'/'test_loss.log
 
+
+for alpha in 0 1 2
+do
 for test_train_num in 10 20
 do
-# for lambda_reg in 10000 100000 1000000 10000000
-# for lambda_reg in 1000 5000
-for lambda_reg in 10000
+# for lambda_reg in 10000 100000 1000000
+for lambda_reg in 1000 5000
+# for lambda_reg in 10000
 do
-python -u run.py   --is_training 1   --root_path ./dataset/traffic/   --data_path traffic.csv   --model_id traffic_96_$pred_len   --model Autoformer   --data custom   --features M   --seq_len 96   --label_len 48   --pred_len $pred_len   --e_layers 2   --d_layers 1   --factor 3   --enc_in 862   --dec_in 862   --c_out 862   --des 'Exp'   --itr 1   --train_epochs 3   --gpu $gpu_num  --test_train_num $test_train_num  --lambda_reg $lambda_reg --run_calc > $cur_path'/'ttn$test_train_num'_'lambda$lambda_reg'_'batch1.log
+
+python -u run.py   --is_training 1   --root_path ./dataset/traffic/   --data_path traffic.csv   --model_id traffic_96_$pred_len   --model Autoformer   --data custom   --features M   --seq_len 96   --label_len 48   --pred_len $pred_len   --e_layers 2   --d_layers 1   --factor 3   --enc_in 862   --dec_in 862   --c_out 862   --des 'Exp'   --itr 1   --train_epochs 3   --gpu $gpu_num  --test_train_num $test_train_num  --lambda_reg $lambda_reg --alpha $alpha --run_calc > $cur_path'/'alpha$alpha'_'ttn$test_train_num'_'lambda$lambda_reg.log
+done
 done
 done
 done

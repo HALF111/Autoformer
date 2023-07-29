@@ -1,6 +1,6 @@
-# gpu_num=0
+gpu_num=0
 # gpu_num=1
-gpu_num=2
+# gpu_num=2
 
 # dir_name=all_result_batch1
 # dir_name=all_result_batch1_average_loss
@@ -8,15 +8,15 @@ gpu_num=2
 # dir_name=all_result_batch1_whole_model
 # dir_name=all_result_test_train_epochs
 # dir_name=all_result_cheated
-# dir_name=all_result_calc_analytics
-dir_name=all_result_calc_decay_MSE
+dir_name=all_result_calc_analytics
+# dir_name=all_result_calc_decay_MSE
 
 
 # 1.ETTh1数据集
 # 1.1 pred_len=24
 # for pred_len in 24 96 192 336 720
-# for pred_len in 96
-for pred_len in 192
+for pred_len in 96
+# for pred_len in 192
 # for pred_len in 192 336 720
 do
 name=ETTh1
@@ -29,17 +29,22 @@ fi
 # only run  test first
 python -u run.py   --is_training 1   --root_path ./dataset/ETT-small/   --data_path ETTh1.csv   --model_id ETTh1_96_$pred_len   --model Autoformer   --data ETTh1   --features M   --seq_len 96   --label_len 48   --pred_len $pred_len   --e_layers 2   --d_layers 1   --factor 3   --enc_in 7   --dec_in 7   --c_out 7   --des 'Exp'   --itr 1   --gpu $gpu_num --run_test > $cur_path'/'test_loss.log
 
+
+for alpha in 0 1 2
+do
 # for test_train_num in 5 10 20 30
 # for test_train_num in 10
-for test_train_num in 10
+# for test_train_num in 10 20
+for test_train_num in 30 50
 do
-# for lambda_reg in 10000 100000 1000000
-for lambda_reg in 10000
+for lambda_reg in 10000 100000 1000000
+# for lambda_reg in 10000
 # for lambda_reg in 100000 1000000 10000000
 # for lambda_reg in 200000
 do
 
-python -u run.py   --is_training 1   --root_path ./dataset/ETT-small/   --data_path ETTh1.csv   --model_id ETTh1_96_$pred_len   --model Autoformer   --data ETTh1   --features M   --seq_len 96   --label_len 48   --pred_len $pred_len   --e_layers 2   --d_layers 1   --factor 3   --enc_in 7   --dec_in 7   --c_out 7   --des 'Exp'   --itr 1   --gpu $gpu_num --test_train_num $test_train_num --lambda_reg $lambda_reg --run_calc > $cur_path'/'ttn$test_train_num'_'lambda$lambda_reg'_'batch1.log
+python -u run.py   --is_training 1   --root_path ./dataset/ETT-small/   --data_path ETTh1.csv   --model_id ETTh1_96_$pred_len   --model Autoformer   --data ETTh1   --features M   --seq_len 96   --label_len 48   --pred_len $pred_len   --e_layers 2   --d_layers 1   --factor 3   --enc_in 7   --dec_in 7   --c_out 7   --des 'Exp'   --itr 1   --gpu $gpu_num --test_train_num $test_train_num --lambda_reg $lambda_reg --alpha $alpha --run_calc > $cur_path'/'alpha$alpha'_'ttn$test_train_num'_'lambda$lambda_reg.log
+done
 done
 done
 done

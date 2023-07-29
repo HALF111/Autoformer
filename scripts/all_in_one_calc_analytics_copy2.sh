@@ -1,6 +1,6 @@
-gpu_num=0
+# gpu_num=0
 # gpu_num=1
-# gpu_num=2
+gpu_num=2
 
 # dir_name=all_result_batch1
 # dir_name=all_result_batch1_average_loss
@@ -8,8 +8,8 @@ gpu_num=0
 # dir_name=all_result_batch1_whole_model
 # dir_name=all_result_test_train_epochs
 # dir_name=all_result_cheated
-# dir_name=all_result_calc_analytics
-dir_name=all_result_calc_decay_MSE
+dir_name=all_result_calc_analytics
+# dir_name=all_result_calc_decay_MSE
 
 
 # # 1.ETTh1数据集
@@ -88,52 +88,57 @@ dir_name=all_result_calc_decay_MSE
 # done
 
 
-# # 5.Electricity数据集
-# # 5.1 pred_len=96
-# # for pred_len in 96 192 336 720
-# for pred_len in 96
-# do
-# name=ECL
-# cur_path=./$dir_name/$name'_'pl$pred_len
-# if [ ! -d $cur_path ]; then
-#     mkdir $cur_path
-# fi
-# # run train and test first
-# python -u run.py  --is_training 1   --root_path ./dataset/electricity/   --data_path electricity.csv   --model_id ECL_96_$pred_len   --model Autoformer   --data custom   --features M   --seq_len 96   --label_len 48   --pred_len $pred_len   --e_layers 2   --d_layers 1   --factor 3  --enc_in 321   --dec_in 321   --c_out 321   --des 'Exp'   --itr 1   --gpu $gpu_num --run_train --run_test > $cur_path'/'train_and_test_loss.log
-
-# for test_train_num in 5 10 15 20 30
-# do
-# for adapted_lr_times in 2000 5000 10000 12000 15000
-# do
-# python -u run.py  --is_training 1   --root_path ./dataset/electricity/   --data_path electricity.csv   --model_id ECL_96_$pred_len   --model Autoformer   --data custom   --features M   --seq_len 96   --label_len 48   --pred_len $pred_len   --e_layers 2   --d_layers 1   --factor 3  --enc_in 321   --dec_in 321   --c_out 321   --des 'Exp'   --itr 1   --gpu $gpu_num --test_train_num $test_train_num --adapted_lr_times $adapted_lr_times > $cur_path'/'ttn$test_train_num'_'lr$adapted_lr_times'_'batch1.log
-# done
-# done
-# done
-
-
-# 6.Exchange数据集
-# 6.1 pred_len=96
+# 5.Electricity数据集
+# 5.1 pred_len=96
 # for pred_len in 96 192 336 720
 for pred_len in 96
 do
-name=Exchange
+name=ECL
 cur_path=./$dir_name/$name'_'pl$pred_len
 if [ ! -d $cur_path ]; then
     mkdir $cur_path
 fi
 # # run train and test first
-# python -u run.py   --is_training 1   --root_path ./dataset/exchange_rate/   --data_path exchange_rate.csv   --model_id Exchange_96_$pred_len   --model Autoformer   --data custom   --features M   --seq_len 96   --label_len 48   --pred_len $pred_len   --e_layers 2   --d_layers 1   --factor 3   --enc_in 8   --dec_in 8   --c_out 8   --des 'Exp'   --itr 1   --gpu $gpu_num --run_train --run_test > $cur_path'/'train_and_test_loss.log
-# run only test first
-python -u run.py   --is_training 1   --root_path ./dataset/exchange_rate/   --data_path exchange_rate.csv   --model_id Exchange_96_$pred_len   --model Autoformer   --data custom   --features M   --seq_len 96   --label_len 48   --pred_len $pred_len   --e_layers 2   --d_layers 1   --factor 3   --enc_in 8   --dec_in 8   --c_out 8   --des 'Exp'   --itr 1   --gpu $gpu_num --run_test > $cur_path'/'test_loss.log
+# python -u run.py  --is_training 1   --root_path ./dataset/electricity/   --data_path electricity.csv   --model_id ECL_96_$pred_len   --model Autoformer   --data custom   --features M   --seq_len 96   --label_len 48   --pred_len $pred_len   --e_layers 2   --d_layers 1   --factor 3  --enc_in 321   --dec_in 321   --c_out 321   --des 'Exp'   --itr 1   --gpu $gpu_num --run_train --run_test > $cur_path'/'train_and_test_loss.log
+# run test first
+python -u run.py  --is_training 1   --root_path ./dataset/electricity/   --data_path electricity.csv   --model_id ECL_96_$pred_len   --model Autoformer   --data custom   --features M   --seq_len 96   --label_len 48   --pred_len $pred_len   --e_layers 2   --d_layers 1   --factor 3  --enc_in 321   --dec_in 321   --c_out 321   --des 'Exp'   --itr 1   --gpu $gpu_num --run_test > $cur_path'/'test_loss.log
 
+for alpha in 0 1 2
+do
 for test_train_num in 10 20
 do
-for lambda_reg in 1000 10000 100000 1000000
+for lambda_reg in 1000 10000 100000
 do
-python -u run.py   --is_training 1   --root_path ./dataset/exchange_rate/   --data_path exchange_rate.csv   --model_id Exchange_96_$pred_len   --model Autoformer   --data custom   --features M   --seq_len 96   --label_len 48   --pred_len $pred_len   --e_layers 2   --d_layers 1   --factor 3   --enc_in 8   --dec_in 8   --c_out 8   --des 'Exp'   --itr 1   --gpu $gpu_num --test_train_num $test_train_num --lambda_reg $lambda_reg --run_calc > $cur_path'/'ttn$test_train_num'_'lambda$lambda_reg'_'batch1.log
+python -u run.py  --is_training 1   --root_path ./dataset/electricity/   --data_path electricity.csv   --model_id ECL_96_$pred_len   --model Autoformer   --data custom   --features M   --seq_len 96   --label_len 48   --pred_len $pred_len   --e_layers 2   --d_layers 1   --factor 3  --enc_in 321   --dec_in 321   --c_out 321   --des 'Exp'   --itr 1   --gpu $gpu_num  --lambda_reg $lambda_reg --alpha $alpha --run_calc > $cur_path'/'alpha$alpha'_'ttn$test_train_num'_'lambda$lambda_reg.log
 done
 done
 done
+done
+
+
+# # 6.Exchange数据集
+# # 6.1 pred_len=96
+# # for pred_len in 96 192 336 720
+# for pred_len in 96
+# do
+# name=Exchange
+# cur_path=./$dir_name/$name'_'pl$pred_len
+# if [ ! -d $cur_path ]; then
+#     mkdir $cur_path
+# fi
+# # # run train and test first
+# # python -u run.py   --is_training 1   --root_path ./dataset/exchange_rate/   --data_path exchange_rate.csv   --model_id Exchange_96_$pred_len   --model Autoformer   --data custom   --features M   --seq_len 96   --label_len 48   --pred_len $pred_len   --e_layers 2   --d_layers 1   --factor 3   --enc_in 8   --dec_in 8   --c_out 8   --des 'Exp'   --itr 1   --gpu $gpu_num --run_train --run_test > $cur_path'/'train_and_test_loss.log
+# # run only test first
+# python -u run.py   --is_training 1   --root_path ./dataset/exchange_rate/   --data_path exchange_rate.csv   --model_id Exchange_96_$pred_len   --model Autoformer   --data custom   --features M   --seq_len 96   --label_len 48   --pred_len $pred_len   --e_layers 2   --d_layers 1   --factor 3   --enc_in 8   --dec_in 8   --c_out 8   --des 'Exp'   --itr 1   --gpu $gpu_num --run_test > $cur_path'/'test_loss.log
+
+# for test_train_num in 10 20
+# do
+# for lambda_reg in 1000 10000 100000 1000000
+# do
+# python -u run.py   --is_training 1   --root_path ./dataset/exchange_rate/   --data_path exchange_rate.csv   --model_id Exchange_96_$pred_len   --model Autoformer   --data custom   --features M   --seq_len 96   --label_len 48   --pred_len $pred_len   --e_layers 2   --d_layers 1   --factor 3   --enc_in 8   --dec_in 8   --c_out 8   --des 'Exp'   --itr 1   --gpu $gpu_num --test_train_num $test_train_num --lambda_reg $lambda_reg --run_calc > $cur_path'/'ttn$test_train_num'_'lambda$lambda_reg'_'batch1.log
+# done
+# done
+# done
 
 
 # # 7.Weather数据集

@@ -169,6 +169,7 @@ class Decoder(nn.Module):
         if self.norm is not None:
             x = self.norm(x)
         
+        # 如果需要return mid_embeddingd的话，那么将其返回
         if return_mid_embedding:
             import copy
             mid_embedding=copy.deepcopy(x)
@@ -177,6 +178,7 @@ class Decoder(nn.Module):
         if self.projection is not None:
             x = self.projection(x)
         
+        # current return
         if return_mid_embedding:
             return x, trend, mid_embedding
         else:

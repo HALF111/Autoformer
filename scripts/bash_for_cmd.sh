@@ -3,6 +3,7 @@ python -u run.py   --is_training 1   --root_path ./dataset/ETT-small/   --data_p
 
 1.2 ETTh1 & pred_len=96
 python -u run.py   --is_training 1   --root_path ./dataset/ETT-small/   --data_path ETTh1.csv   --model_id ETTh1_96_96   --model Autoformer   --data ETTh1   --features M   --seq_len 96   --label_len 48   --pred_len 96   --e_layers 2   --d_layers 1   --factor 3   --enc_in 7   --dec_in 7   --c_out 7   --des 'Exp'   --itr 1   --gpu 1 --test_train_num 10
+python -u run.py   --is_training 1   --root_path ./dataset/ETT-small/   --data_path ETTh1.csv   --model_id ETTh1_96_96   --model Autoformer   --data ETTh1   --features M   --seq_len 96   --label_len 48   --pred_len 96   --e_layers 2   --d_layers 1   --factor 3   --enc_in 7   --dec_in 7   --c_out 7   --des 'Exp'   --itr 1   --gpu 1 --test_train_num 200 --run_select_with_distance --selected_data_num 10 --adapted_lr_times 5
 
 1.3 ETTh1 & pred_len=168
 python -u run.py   --is_training 1   --root_path ./dataset/ETT-small/   --data_path ETTh1.csv   --model_id ETTh1_96_168   --model Autoformer   --data ETTh1   --features M   --seq_len 96   --label_len 48   --pred_len 168   --e_layers 2   --d_layers 1   --factor 3   --enc_in 7   --dec_in 7   --c_out 7   --des 'Exp'   --itr 1   --gpu 1 --test_train_num 10
@@ -14,6 +15,10 @@ python -u run.py   --is_training 1   --root_path ./dataset/ETT-small/   --data_p
 
 2.1 ETTh2 & pred_len=24
 python -u run.py   --is_training 1   --root_path ./dataset/ETT-small/   --data_path ETTh2.csv   --model_id ETTh2_96_24   --model Autoformer   --data ETTh2   --features M   --seq_len 96   --label_len 48   --pred_len 24   --e_layers 2   --d_layers 1   --factor 3   --enc_in 7   --dec_in 7   --c_out 7   --des 'Exp'   --itr 1   --gpu 1 --test_train_num 10
+
+2.2 ETTh2 & pred_len=96
+python -u run.py   --is_training 1   --root_path ./dataset/ETT-small/   --data_path ETTh2.csv   --model_id ETTh2_96_96   --model Autoformer   --data ETTh2   --features M   --seq_len 96   --label_len 48   --pred_len 96   --e_layers 2   --d_layers 1   --factor 3   --enc_in 7   --dec_in 7   --c_out 7   --des 'Exp'   --itr 1   --gpu 1 --test_train_num 10
+python -u run.py   --is_training 1   --root_path ./dataset/ETT-small/   --data_path ETTh2.csv   --model_id ETTh2_96_96   --model Autoformer   --data ETTh2   --features M   --seq_len 96   --label_len 48   --pred_len 96   --e_layers 2   --d_layers 1   --factor 3   --enc_in 7   --dec_in 7   --c_out 7   --des 'Exp'   --itr 1   --gpu 1 --test_train_num 200 --run_select_with_distance --selected_data_num 10 --adapted_lr_times 5
 
 
 
@@ -44,7 +49,7 @@ python -u run.py   --is_training 1   --root_path ./dataset/traffic/   --data_pat
 
 8.1 Weather & pred_len=96
 python -u run.py   --is_training 1   --root_path ./dataset/weather/   --data_path weather.csv   --model_id weather_96_96   --model Autoformer   --data custom   --features M   --seq_len 96   --label_len 48   --pred_len 96   --e_layers 2   --d_layers 1   --factor 3   --enc_in 21   --dec_in 21   --c_out 21   --des 'Exp'   --itr 1   --train_epochs 2   --gpu 1  --test_train_num 10
-
+python -u run.py   --is_training 1   --root_path ./dataset/weather/   --data_path weather.csv   --model_id weather_96_96   --model Autoformer   --data custom   --features M   --seq_len 96   --label_len 48   --pred_len 96   --e_layers 2   --d_layers 1   --factor 3   --enc_in 21   --dec_in 21   --c_out 21   --des 'Exp'   --itr 1   --train_epochs 2   --gpu 1  --test_train_num 1000 --run_select_with_distance --selected_data_num 20 --adapted_lr_times 10
 
 
 9.1 Illness & pred_len=24

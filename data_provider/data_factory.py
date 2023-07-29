@@ -84,7 +84,6 @@ def data_provider_at_test_time(args, flag):
         shuffle_flag = False
         # drop_last = False
         drop_last = True
-        batch_size = args.batch_size
         freq = args.freq
 
         # 注意：因为我们要做TTT/TTA，所以一定要把batch_size设置成1 ！！！
@@ -94,15 +93,30 @@ def data_provider_at_test_time(args, flag):
         # batch_size = 4
         # batch_size = 2857
         # batch_size = 256
+    elif flag == "val":
+        shuffle_flag = False
+        # drop_last = False
+        drop_last = True
+        freq = args.freq
 
-        # Data = Dataset_Custom_Test
-        dataset_name = args.data
-        if dataset_name == "ETTh1" or dataset_name == "ETTh2":
-            Data = Dataset_ETT_hour_Test
-        elif dataset_name == 'ETTm1' or dataset_name == 'ETTm2':
-            Data = Dataset_ETT_minute_Test
-        else:
-            Data = Dataset_Custom_Test
+        # 注意：因为我们要做TTT/TTA，所以一定要把batch_size设置成1 ！！！
+        batch_size = args.adapted_batch_size
+        # batch_size = 32
+
+    # 再多一个use_nearest_data参数
+    use_nearest_data = args.use_nearest_data
+    use_further_data = args.use_further_data
+    adapt_start_pos = args.adapt_start_pos
+
+
+    # Data = Dataset_Custom_Test
+    dataset_name = args.data
+    if dataset_name == "ETTh1" or dataset_name == "ETTh2":
+        Data = Dataset_ETT_hour_Test
+    elif dataset_name == 'ETTm1' or dataset_name == 'ETTm2':
+        Data = Dataset_ETT_minute_Test
+    else:
+        Data = Dataset_Custom_Test
 
 
     data_set = Data(
@@ -114,7 +128,11 @@ def data_provider_at_test_time(args, flag):
         target=args.target,
         timeenc=timeenc,
         freq=freq,
-        test_train_num = args.test_train_num
+        test_train_num = args.test_train_num,
+        # 别忘了下面这两个参数
+        use_nearest_data=use_nearest_data,
+        use_further_data=use_further_data,
+        adapt_start_pos=adapt_start_pos
     )
 
     print(flag, len(data_set))

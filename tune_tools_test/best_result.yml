@@ -1,0 +1,10 @@
+# config.yml
+target:
+  - max: result # (or min: result)
+group_by:
+  - dataset
+  - model
+find_best:
+  - alpha
+  - test_train_num
+  - lambda_reg

@@ -85,10 +85,38 @@ def main():
     parser.add_argument('--test_train_epochs', type=int, default=1, help='the batch_size for adaptation use')  # adaptation时的数据集取的batch_size设置为多大
     parser.add_argument('--run_train', action='store_true')
     parser.add_argument('--run_test', action='store_true')
+    parser.add_argument('--run_test_batchsize1', action='store_true')
     parser.add_argument('--run_adapt', action='store_true')
     parser.add_argument('--run_calc', action='store_true')
-    parser.add_argument('--lambda_reg', type=float, default=1)
-    parser.add_argument('--alpha', type=float, default=1)
+    parser.add_argument('--run_get_grads', action='store_true')
+    parser.add_argument('--run_get_lookback_data', action='store_true')
+    
+    parser.add_argument('--run_select_with_distance', action='store_true')
+    # selected_data_num表示从过去test_train_num个样本中按照距离挑选出最小的多少个出来
+    # 因此这里要求必须有lookback_data_num <= test_train_num成立
+    parser.add_argument('--selected_data_num', type=int, default=5)
+
+    parser.add_argument('--get_grads_from', type=str, default="test", help="options:[test, val]")
+    parser.add_argument('--adapted_degree', type=str, default="small", help="options:[small, large]")
+
+    # 解析解用的参数alpha和lambda
+    parser.add_argument('--lambda_reg', type=int, default=1)
+    parser.add_argument('--alpha', type=int, default=1)
+
+    # 改用更近（填0）或更远（周期性）的数据做adaptation
+    parser.add_argument('--use_nearest_data', action='store_true')
+    parser.add_argument('--use_further_data', action='store_true')
+    # 理论上当adapt_start_pos == pred_len时，本方法与原来方法相同;
+    # 但是但是由于实现的原因，要求必须保证：
+    # 1.当use_nearest_data时，要求保证adapt_start_pos严格小于pred_len
+    # 2.当use_further_data时，要求保证adapt_start_pos严格大于等于pred_len
+    parser.add_argument('--adapt_start_pos', type=int, default=1)
+
+    parser.add_argument('--run_calc_acf', action='store_true')
+    parser.add_argument('--acf_lag', type=int, default=1)
+    parser.add_argument('--run_calc_kldiv', action='store_true')
+
+    parser.add_argument('--adapt_part_channels', action='store_true')
 
     # KNN
     parser.add_argument('--feature_dim', type=int, default=50)
@@ -116,6 +144,7 @@ def main():
 
             # setting record of experiments
             # 别忘记加上test_train_num一项！！！
+            # ttn现在应该去掉了
             # setting = '{}_{}_{}_ft{}_sl{}_ll{}_pl{}_dm{}_nh{}_el{}_dl{}_df{}_fc{}_eb{}_dt{}_ttn{}_{}_{}'.format(
             setting = '{}_{}_{}_ft{}_sl{}_ll{}_pl{}_dm{}_nh{}_el{}_dl{}_df{}_fc{}_eb{}_dt{}_{}_{}'.format(
                 args.model_id,
@@ -146,9 +175,10 @@ def main():
                 # exp.test(setting, flag="test")
                 exp.test(setting, test=1, flag="test")
 
-            # print('>>>>>>>normal testing but batch_size is 1 : {}<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<'.format(setting))
-            # # exp.test(setting, flag="test_with_batchsize_1")
-            # exp.test(setting, test=1, flag="test_with_batchsize_1")
+            if args.run_test_batchsize1:
+                print('>>>>>>>normal testing but batch_size is 1 : {}<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<'.format(setting))
+                # exp.test(setting, flag="test_with_batchsize_1")
+                exp.test(setting, test=1, flag="test_with_batchsize_1")
 
             if args.run_adapt:
                 # # 对整个模型进行fine-tuning
@@ -165,7 +195,62 @@ def main():
             
             if args.run_calc:
                 print('>>>>>>>run_calc test with test-time training : {}<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<'.format(setting))
-                exp.calc_test(setting, test=1, is_training_part_params=True, use_adapted_model=True, test_train_epochs=args.test_train_epochs)
+
+                #获取梯度
+                weight_path = "./grads_npy/" + setting
+                if args.get_grads_from == "test":
+                    weight_file = f"{weight_path}/weights_{args.get_grads_from}_{args.adapted_degree}_ttn{args.test_train_num}.txt"
+                elif args.get_grads_from == "val":
+                    weight_file = f"{weight_path}/weights_{args.get_grads_from}_{args.adapted_degree}_ttn{args.test_train_num}.txt"
+
+                if os.path.exists(weight_file):
+                    with open(weight_file) as f:
+                        weights_str = f.readline()
+                        weights_str_list = weights_str.split(',')
+                        weights = [float(weight) for weight in weights_str_list]
+                    print(weights)
+                else:
+                    weights = None
+
+                mse, mae = exp.calc_test(setting, test=1, is_training_part_params=True, use_adapted_model=True, test_train_epochs=args.test_train_epochs, weights_given=weights)
+
+                # 存储mse和mae结果，便于读取
+                result_dir = "./mse_and_mae_results"
+                dataset_name = args.data_path.replace(".csv", "")
+                file_name = f"{dataset_name}_pl{args.pred_len}_alpha{int(args.alpha)}_ttn{args.test_train_num}_lambda{int(args.lambda_reg)}.txt"
+
+                if not os.path.exists(result_dir):
+                    os.makedirs(result_dir)
+                file_path = os.path.join(result_dir, file_name)
+                with open(file_path, "w") as f:
+                    f.write(f"{mse}, {mae}")
+            
+            if args.run_select_with_distance:
+                # 只对最后的全连接层projection层进行fine-tuning
+                print('>>>>>>>my testing with test-time training : {}<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<'.format(setting))
+                exp.select_with_distance(setting, test=1, is_training_part_params=True, use_adapted_model=True, test_train_epochs=args.test_train_epochs)
+
+            if args.run_get_grads:
+                print('>>>>>>>get grads : {}<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<'.format(setting))
+                if args.get_grads_from == "test":  # 在test数据集上做
+                    exp.get_grads(setting, test=1, is_training_part_params=True, use_adapted_model=True, test_train_epochs=args.test_train_epochs, flag="test", adapted_degree=args.adapted_degree)
+                elif args.get_grads_from == "val":  # 在val数据集上做
+                    exp.get_grads(setting, test=1, is_training_part_params=True, use_adapted_model=True, test_train_epochs=args.test_train_epochs, flag="val", adapted_degree=args.adapted_degree)
+
+            if args.run_get_lookback_data:
+                print('>>>>>>>get look-back data : {}<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<'.format(setting))
+                exp.get_lookback_data(setting)
+
+            if args.run_calc_acf:
+                # 记得一定一定一定要加上"--batch_size 1"！！！
+                print('>>>>>>>calc ACF with lag={} : {}<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<'.format(args.acf_lag, setting))
+                exp.calc_acf(setting, lag=args.acf_lag)
+            
+            if args.run_calc_kldiv:
+                # 记得一定一定一定要加上"--batch_size 1"！！！
+                print('>>>>>>>calc KLdiv between train/val/test{} : {}<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<'.format(args.acf_lag, setting))
+                exp.calc_KLdiv(setting)
+
 
             # print('>>>>>>>my testing but with original model : {}<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<'.format(setting))
             # exp.my_test(setting, is_training_part_params=True, use_adapted_model=False)

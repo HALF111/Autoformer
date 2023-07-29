@@ -1,0 +1,14 @@
+# config.yml
+target:
+  - result
+group_by:
+  - alpha
+  - test_train_num
+  - lambda_reg
+where:
+  - param_dataset: 'ECL'
+  - param_model: 'Autoformer'
+draw:
+  - x: alpha
+  - y: result
+  - legend: beta=${param_beta}
