@@ -36,9 +36,10 @@ class Exp_Main_Test(Exp_Basic):
         self.test_train_num = self.args.test_train_num
 
         data_path = self.args.data_path
-        # if "ETTh1" in data_path: selected_channels = [1,3]  # [1,3, 2,4,5,6]
-        if "ETTh1" in data_path: selected_channels = [7]
-        elif "ETTh2" in data_path: selected_channels = [1,3,7]
+        if "ETTh1" in data_path: selected_channels = [1,3]  # [1,3, 2,4,5,6]
+        # if "ETTh1" in data_path: selected_channels = [7]
+        # elif "ETTh2" in data_path: selected_channels = [1,3,7]
+        elif "ETTh2" in data_path: selected_channels = [7]
         elif "ETTm1" in data_path: selected_channels = [1,3, 2,4,5]
         elif "ETTm2" in data_path: selected_channels = [1,7, 3]
         elif "illness" in data_path: selected_channels = [1,2, 3,4,5]
@@ -969,7 +970,7 @@ class Exp_Main_Test(Exp_Basic):
             w_T = params[0].grad.T  # 先对weight参数做转置
             b = params[1].grad.unsqueeze(0)  # 将bias参数扩展一维
             params_answer = torch.cat((w_T, b), 0)  # 将w_T和b参数concat起来
-            params_answer = params_answer.ravel()  # 最后再展开成一维的
+            params_answer = params_answer.ravel()  # 最后再展开成一维的，就得到了标准答案对应的梯度方向
 
             model_optim.zero_grad()  # 清空梯度
 
@@ -1028,11 +1029,6 @@ class Exp_Main_Test(Exp_Basic):
 
 
                 for ii in selected_indices:
-                    # if pass_num == 1 and ii not in accpted_samples_num:
-                    #     continue
-
-                    # if not ((self.test_train_num - 1 - ii) + self.args.pred_len) % 96 == 0:
-                    #     continue
 
                     model_optim.zero_grad()
 
@@ -1103,6 +1099,7 @@ class Exp_Main_Test(Exp_Basic):
                 for i in range(len(params)):
                     results += params[i] * weights[i]
                 return results
+            
             # 权重分别乘到对应的梯度上
             if weights_given:
                 weighted_params = calc_weighted_params(cur_grad_list, weights_given)
@@ -1154,20 +1151,21 @@ class Exp_Main_Test(Exp_Basic):
             # model_optim.step()
 
 
-            seq_len = self.args.seq_len
-            label_len = self.args.label_len
-            pred_len = self.args.pred_len
-            tmp_loss = 0
-            for ii in selected_indices:
-                pred, true = self._process_one_batch_with_model(cur_model, test_data,
-                    batch_x[:, ii : ii+seq_len, :], batch_x[:, ii+seq_len-label_len : ii+seq_len+pred_len, :], 
-                    batch_x_mark[:, ii : ii+seq_len, :], batch_x_mark[:, ii+seq_len-label_len : ii+seq_len+pred_len, :])
-                if self.args.adapt_part_channels:
-                    pred = pred[:, :, self.selected_channels]
-                    true = true[:, :, self.selected_channels]
-                tmp_loss += criterion(pred, true)
-            tmp_loss = tmp_loss / self.args.selected_data_num
-            a3.append(tmp_loss.item())
+            # seq_len = self.args.seq_len
+            # label_len = self.args.label_len
+            # pred_len = self.args.pred_len
+            # tmp_loss = 0
+            # for ii in selected_indices:
+            #     pred, true = self._process_one_batch_with_model(cur_model, test_data,
+            #         batch_x[:, ii : ii+seq_len, :], batch_x[:, ii+seq_len-label_len : ii+seq_len+pred_len, :], 
+            #         batch_x_mark[:, ii : ii+seq_len, :], batch_x_mark[:, ii+seq_len-label_len : ii+seq_len+pred_len, :])
+            #     if self.args.adapt_part_channels:
+            #         pred = pred[:, :, self.selected_channels]
+            #         true = true[:, :, self.selected_channels]
+            #     tmp_loss += criterion(pred, true)
+            # tmp_loss = tmp_loss / self.args.selected_data_num
+            # a3.append(tmp_loss.item())
+            a3.append(0)
 
 
 
@@ -1186,18 +1184,18 @@ class Exp_Main_Test(Exp_Basic):
                     pred, true = self._process_one_batch_with_model(cur_model, test_data,
                         batch_x[:, -((pred_len - adapt_start_pos) + seq_len):-(pred_len - adapt_start_pos), :], batch_y, 
                         batch_x_mark[:, -((pred_len - adapt_start_pos) + seq_len):-(pred_len - adapt_start_pos), :], batch_y_mark)
-            else:
-                # pred, true = self._process_one_batch_with_model(self.model, test_data,
-                #     batch_x[:, -self.args.seq_len:, :], batch_y, 
-                #     batch_x_mark[:, -self.args.seq_len:, :], batch_y_mark)
-                if not self.args.use_nearest_data or self.args.use_further_data:
-                    pred, true = self._process_one_batch_with_model(cur_model, test_data,
-                        batch_x[:, -seq_len:, :], batch_y, 
-                        batch_x_mark[:, -seq_len:, :], batch_y_mark)
-                else:
-                    pred, true = self._process_one_batch_with_model(cur_model, test_data,
-                        batch_x[:, -((pred_len - adapt_start_pos) + seq_len):-(pred_len - adapt_start_pos), :], batch_y, 
-                        batch_x_mark[:, -((pred_len - adapt_start_pos) + seq_len):-(pred_len - adapt_start_pos), :], batch_y_mark)
+            # else:
+            #     # pred, true = self._process_one_batch_with_model(self.model, test_data,
+            #     #     batch_x[:, -self.args.seq_len:, :], batch_y, 
+            #     #     batch_x_mark[:, -self.args.seq_len:, :], batch_y_mark)
+            #     if not self.args.use_nearest_data or self.args.use_further_data:
+            #         pred, true = self._process_one_batch_with_model(cur_model, test_data,
+            #             batch_x[:, -seq_len:, :], batch_y, 
+            #             batch_x_mark[:, -seq_len:, :], batch_y_mark)
+            #     else:
+            #         pred, true = self._process_one_batch_with_model(cur_model, test_data,
+            #             batch_x[:, -((pred_len - adapt_start_pos) + seq_len):-(pred_len - adapt_start_pos), :], batch_y, 
+            #             batch_x_mark[:, -((pred_len - adapt_start_pos) + seq_len):-(pred_len - adapt_start_pos), :], batch_y_mark)
 
             # 如果需要筛选部分维度，那么做一次筛选：
             if self.args.adapt_part_channels:
@@ -1239,7 +1237,7 @@ class Exp_Main_Test(Exp_Basic):
                 print("last one:", a1[-1], a2[-1], a3[-1], a4[-1], all_angels[-1])
 
                 printed_selected_channels = [item+1 for item in self.selected_channels]
-                print(f"selected_channels: {printed_selected_channels}")
+                print(f"adapt_part_channels: {self.args.adapt_part_channels}, selected_channels: {printed_selected_channels}")
                 print(f"selected_distance_pairs are: {selected_distance_pairs}")
 
 

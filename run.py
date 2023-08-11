@@ -90,11 +90,10 @@ def main():
     parser.add_argument('--run_calc', action='store_true')
     parser.add_argument('--run_get_grads', action='store_true')
     parser.add_argument('--run_get_lookback_data', action='store_true')
-    
     parser.add_argument('--run_select_with_distance', action='store_true')
     # selected_data_num表示从过去test_train_num个样本中按照距离挑选出最小的多少个出来
     # 因此这里要求必须有lookback_data_num <= test_train_num成立
-    parser.add_argument('--selected_data_num', type=int, default=5)
+    parser.add_argument('--selected_data_num', type=int, default=10)
 
     parser.add_argument('--get_grads_from', type=str, default="test", help="options:[test, val]")
     parser.add_argument('--adapted_degree', type=str, default="small", help="options:[small, large]")
