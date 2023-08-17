@@ -114,8 +114,11 @@ def main():
     parser.add_argument('--run_calc_acf', action='store_true')
     parser.add_argument('--acf_lag', type=int, default=1)
     parser.add_argument('--run_calc_kldiv', action='store_true')
+    parser.add_argument('--get_data_error', action='store_true')
 
     parser.add_argument('--adapt_part_channels', action='store_true')
+    # 仅对周期性数据做fine-tuning
+    parser.add_argument('--adapt_cycle', action='store_true')
 
     # KNN
     parser.add_argument('--feature_dim', type=int, default=50)
@@ -249,7 +252,11 @@ def main():
                 # 记得一定一定一定要加上"--batch_size 1"！！！
                 print('>>>>>>>calc KLdiv between train/val/test{} : {}<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<'.format(args.acf_lag, setting))
                 exp.calc_KLdiv(setting)
-
+            
+            if args.get_data_error:
+                # 记得一定一定一定要加上"--batch_size 1"！！！
+                print('>>>>>>>get_data_error of train/val/test{} : {}<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<'.format(args.acf_lag, setting))
+                exp.get_data_error(setting=setting)
 
             # print('>>>>>>>my testing but with original model : {}<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<'.format(setting))
             # exp.my_test(setting, is_training_part_params=True, use_adapted_model=False)

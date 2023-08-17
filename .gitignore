@@ -129,16 +129,22 @@ dmypy.json
 .pyre/
 
 
+
+# 自己加的一些内容
 /checkpoints
 /dataset
 /results
 /test_results
 
-
 *.npz
 *.npy
-
 
 /.tune
 # *.png
 # *.pdf
+
+*.csv
+*.pth
+
+/distances_and_loss_diff
+/grads_npy
