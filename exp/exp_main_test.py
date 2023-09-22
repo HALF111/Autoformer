@@ -35,16 +35,14 @@ class Exp_Main_Test(Exp_Basic):
         # 这个可以作为超参数来设置
         self.test_train_num = self.args.test_train_num
 
+        # 判断哪些channels是有周期性的
         data_path = self.args.data_path
-        # if "ETTh1" in data_path: selected_channels = [1,3]  # [1,3, 2,4,5,6]
-        if "ETTh1" in data_path: selected_channels = [2,5,7]
+        if "ETTh1" in data_path: selected_channels = [1,3]  # [1,3, 2,4,5,6]
+        # if "ETTh1" in data_path: selected_channels = [7]
         # elif "ETTh2" in data_path: selected_channels = [1,3,7]
-        elif "ETTh2" in data_path: selected_channels = [5,6]
-        # elif "ETTm1" in data_path: selected_channels = [1,3, 2,4,5]
-        # elif "ETTm1" in data_path: selected_channels = [1,3]
-        # elif "ETTm1" in data_path: selected_channels = [2,4,5]
-        elif "ETTm1" in data_path: selected_channels = [6,7]
-        elif "ETTm2" in data_path: selected_channels = [1,7]  # [1,7, 3]
+        elif "ETTh2" in data_path: selected_channels = [7]
+        elif "ETTm1" in data_path: selected_channels = [1,3, 2,4,5]
+        elif "ETTm2" in data_path: selected_channels = [1,7, 3]
         elif "illness" in data_path: selected_channels = [1,2, 3,4,5]
         # elif "illness" in data_path: selected_channels = [6,7]
         # elif "weather" in data_path: selected_channels = [17,18,19, 5,8,6,13,20]  # [2,3,11]
@@ -56,6 +54,19 @@ class Exp_Main_Test(Exp_Basic):
             selected_channels[channel] -= 1  # 注意这里要读每个item变成item-1，而非item
         
         self.selected_channels = selected_channels
+
+        # 判断各个数据集的周期是多久
+        if "ETTh1" in data_path: period = 24
+        elif "ETTh2" in data_path: period = 24
+        elif "ETTm1" in data_path: period = 96
+        elif "ETTm2" in data_path: period = 96
+        elif "electricity" in data_path: period = 24
+        elif "traffic" in data_path: period = 24
+        elif "illness" in data_path: period = 52.142857
+        elif "weather" in data_path: period = 144
+        elif "Exchange" in data_path: period = 1
+        else: period = 1
+        self.period = period
 
 
     def _build_model(self):
@@ -687,6 +698,90 @@ class Exp_Main_Test(Exp_Basic):
     #         print(test_y.shape)
     #         print(lookback_x.shape)
     #         print(lookback_y.shape)
+    
+    
+    def get_data_error(self, setting, test=0):
+        print('loading model from checkpoint !!!')
+        self.model.load_state_dict(torch.load(os.path.join('./checkpoints/' + setting, 'checkpoint.pth'), map_location='cuda:0'))
+        
+        assert self.args.batch_size == 1
+
+        for flag in ["train_without_shuffle", "val_without_shuffle", "test"]:
+            cur_data, cur_loader = self._get_data(flag=flag)
+
+            test_time_start = time.time()
+            
+            results = []
+
+            self.model.eval()
+            with torch.no_grad():
+                for i, (batch_x, batch_y, batch_x_mark, batch_y_mark) in enumerate(cur_loader):
+                    batch_x = batch_x.float().to(self.device)
+                    batch_y = batch_y.float().to(self.device)
+
+                    batch_x_mark = batch_x_mark.float().to(self.device)
+                    batch_y_mark = batch_y_mark.float().to(self.device)
+
+                    # decoder input
+                    dec_inp = torch.zeros_like(batch_y[:, -self.args.pred_len:, :]).float()
+                    dec_inp = torch.cat([batch_y[:, :self.args.label_len, :], dec_inp], dim=1).float().to(self.device)
+
+                    pred, true = self._process_one_batch_with_model(self.model, cur_data,
+                        batch_x, batch_y, 
+                        batch_x_mark, batch_y_mark)
+
+
+                    pred = pred.detach().cpu().numpy()
+                    pred = pred.reshape(pred.shape[1], pred.shape[2])
+                    true = true.detach().cpu().numpy()
+                    true = true.reshape(true.shape[1], true.shape[2])
+                    
+                    mae, mse, rmse, mape, mspe = metric(pred, true)
+                    # print('mse:{}, mae:{}'.format(mse, mae))
+                    
+                    error = pred - true
+                    # print(error.shape)
+                    err_mean = np.mean(error)
+                    err_var = np.var(error)
+                    err_abs_mean = np.mean(np.abs(error))
+                    err_abs_var = np.var(np.abs(error))
+                    pos_num, neg_num = 0, 0
+                    for ei in range(error.shape[0]):
+                        for ej in range(error.shape[1]):
+                            if error[ei][ej] >= 0: pos_num += 1
+                            else: neg_num += 1
+                    assert pos_num + neg_num == error.shape[0] * error.shape[1]
+                    
+                    tmp_list = [mae, mse, rmse, mape, mspe, err_mean, err_var, err_abs_mean, err_abs_var, pos_num, neg_num]
+                    results.append(tmp_list)
+                    
+                    if i % 100 == 0:
+                        print(f"data {i} have been calculated, cost time: {time.time() - test_time_start}s")
+                        print('mse:{}, mae:{}'.format(mse, mae))
+                        
+            
+
+            # result save
+            folder_path = './error_results/' + setting + '/'
+            if not os.path.exists(folder_path):
+                os.makedirs(folder_path)
+
+            if "train" in flag: file_flag = "train"
+            elif "val" in flag: file_flag = "val"
+            elif "test" in flag: file_flag = "test"
+            file_name = folder_path + f"pl{self.args.pred_len}_{file_flag}.txt"
+            
+            with open(file_name, "w") as f:
+                for result in results:
+                    for idx in range(len(result)-1):
+                        item = result[idx]
+                        f.write(f"{item}, ")
+                    f.write(f"{result[-1]}")
+                    f.write("\n")
+        
+        return
+            
+        
 
     def get_lookback_data(self, setting, test=0):
         for flag in ["test", "val"]:
@@ -1430,7 +1525,7 @@ class Exp_Main_Test(Exp_Basic):
             w_T = params[0].grad.T  # 先对weight参数做转置
             b = params[1].grad.unsqueeze(0)  # 将bias参数扩展一维
             params_answer = torch.cat((w_T, b), 0)  # 将w_T和b参数concat起来
-            params_answer = params_answer.ravel()  # 最后再展开成一维的
+            params_answer = params_answer.ravel()  # 最后再展开成一维的，就得到了标准答案对应的梯度方向
 
             model_optim.zero_grad()  # 清空梯度
 
@@ -1456,6 +1551,20 @@ class Exp_Main_Test(Exp_Basic):
             
             distance_pairs = []
             for ii in range(self.args.test_train_num):
+                # 只对周期性样本计算x之间的距离
+                if self.args.adapt_cycle:
+                    # 为了计算当前的样本和测试样本间时间差是否是周期的倍数
+                    # 我们先计算时间差与周期相除的余数
+                    if 'illness' in self.args.data_path:
+                        cycle_remainer = math.fmod(self.args.test_train_num-1 + self.args.pred_len - ii, self.period)
+                    cycle_remainer = (self.args.test_train_num-1 + self.args.pred_len - ii) % self.period
+                    # 定义判定的阈值
+                    threshold = self.period // 12
+                    # 如果余数在[-threshold, threshold]之间，那么考虑使用其做fine-tune
+                    # 否则的话不将其纳入计算距离的数据范围内
+                    if cycle_remainer > threshold or cycle_remainer < -threshold:
+                        continue
+                    
                 if self.args.adapt_part_channels:
                     lookback_x = batch_x[:, ii : ii+seq_len, self.selected_channels].reshape(-1)
                 else:
@@ -1489,11 +1598,6 @@ class Exp_Main_Test(Exp_Basic):
 
 
                 for ii in selected_indices:
-                    # if pass_num == 1 and ii not in accpted_samples_num:
-                    #     continue
-
-                    # if not ((self.test_train_num - 1 - ii) + self.args.pred_len) % 96 == 0:
-                    #     continue
 
                     model_optim.zero_grad()
 
@@ -1564,6 +1668,7 @@ class Exp_Main_Test(Exp_Basic):
                 for i in range(len(params)):
                     results += params[i] * weights[i]
                 return results
+            
             # 权重分别乘到对应的梯度上
             if weights_given:
                 weighted_params = calc_weighted_params(cur_grad_list, weights_given)
@@ -1615,20 +1720,20 @@ class Exp_Main_Test(Exp_Basic):
             # model_optim.step()
 
 
-            # seq_len = self.args.seq_len
-            # label_len = self.args.label_len
-            # pred_len = self.args.pred_len
-            # tmp_loss = 0
-            # for ii in selected_indices:
-            #     pred, true = self._process_one_batch_with_model(cur_model, test_data,
-            #         batch_x[:, ii : ii+seq_len, :], batch_x[:, ii+seq_len-label_len : ii+seq_len+pred_len, :], 
-            #         batch_x_mark[:, ii : ii+seq_len, :], batch_x_mark[:, ii+seq_len-label_len : ii+seq_len+pred_len, :])
-            #     if self.args.adapt_part_channels:
-            #         pred = pred[:, :, self.selected_channels]
-            #         true = true[:, :, self.selected_channels]
-            #     tmp_loss += criterion(pred, true)
-            # tmp_loss = tmp_loss / self.args.selected_data_num
-            # a3.append(tmp_loss.item())
+            seq_len = self.args.seq_len
+            label_len = self.args.label_len
+            pred_len = self.args.pred_len
+            tmp_loss = 0
+            for ii in selected_indices:
+                pred, true = self._process_one_batch_with_model(cur_model, test_data,
+                    batch_x[:, ii : ii+seq_len, :], batch_x[:, ii+seq_len-label_len : ii+seq_len+pred_len, :], 
+                    batch_x_mark[:, ii : ii+seq_len, :], batch_x_mark[:, ii+seq_len-label_len : ii+seq_len+pred_len, :])
+                if self.args.adapt_part_channels:
+                    pred = pred[:, :, self.selected_channels]
+                    true = true[:, :, self.selected_channels]
+                tmp_loss += criterion(pred, true)
+            tmp_loss = tmp_loss / self.args.selected_data_num
+            a3.append(tmp_loss.item())
 
             a3.append(0)
 
@@ -1649,18 +1754,18 @@ class Exp_Main_Test(Exp_Basic):
                     pred, true = self._process_one_batch_with_model(cur_model, test_data,
                         batch_x[:, -((pred_len - adapt_start_pos) + seq_len):-(pred_len - adapt_start_pos), :], batch_y, 
                         batch_x_mark[:, -((pred_len - adapt_start_pos) + seq_len):-(pred_len - adapt_start_pos), :], batch_y_mark)
-            else:
-                # pred, true = self._process_one_batch_with_model(self.model, test_data,
-                #     batch_x[:, -self.args.seq_len:, :], batch_y, 
-                #     batch_x_mark[:, -self.args.seq_len:, :], batch_y_mark)
-                if not self.args.use_nearest_data or self.args.use_further_data:
-                    pred, true = self._process_one_batch_with_model(cur_model, test_data,
-                        batch_x[:, -seq_len:, :], batch_y, 
-                        batch_x_mark[:, -seq_len:, :], batch_y_mark)
-                else:
-                    pred, true = self._process_one_batch_with_model(cur_model, test_data,
-                        batch_x[:, -((pred_len - adapt_start_pos) + seq_len):-(pred_len - adapt_start_pos), :], batch_y, 
-                        batch_x_mark[:, -((pred_len - adapt_start_pos) + seq_len):-(pred_len - adapt_start_pos), :], batch_y_mark)
+            # else:
+            #     # pred, true = self._process_one_batch_with_model(self.model, test_data,
+            #     #     batch_x[:, -self.args.seq_len:, :], batch_y, 
+            #     #     batch_x_mark[:, -self.args.seq_len:, :], batch_y_mark)
+            #     if not self.args.use_nearest_data or self.args.use_further_data:
+            #         pred, true = self._process_one_batch_with_model(cur_model, test_data,
+            #             batch_x[:, -seq_len:, :], batch_y, 
+            #             batch_x_mark[:, -seq_len:, :], batch_y_mark)
+            #     else:
+            #         pred, true = self._process_one_batch_with_model(cur_model, test_data,
+            #             batch_x[:, -((pred_len - adapt_start_pos) + seq_len):-(pred_len - adapt_start_pos), :], batch_y, 
+            #             batch_x_mark[:, -((pred_len - adapt_start_pos) + seq_len):-(pred_len - adapt_start_pos), :], batch_y_mark)
 
             # 如果需要筛选部分维度，那么做一次筛选：
             if self.args.adapt_part_channels:
@@ -1702,9 +1807,8 @@ class Exp_Main_Test(Exp_Basic):
                 print("last one:", a1[-1], a2[-1], a3[-1], a4[-1], all_angels[-1])
 
                 printed_selected_channels = [item+1 for item in self.selected_channels]
-                printed_unselected_channels = [item+1 for item in unselected_channels]
-                print(f"selected_channels: {printed_selected_channels}")
-                print(f"unselected_channels: {printed_unselected_channels}")
+                print(f"adapt_part_channels: {self.args.adapt_part_channels}, and adapt_cycle: {self.args.adapt_cycle}")
+                print(f"selected_channels: {printed_selected_channels[:25]}")
                 print(f"selected_distance_pairs are: {selected_distance_pairs}")
 
 
