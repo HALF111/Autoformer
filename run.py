@@ -96,6 +96,9 @@ def main():
     # 因此这里要求必须有lookback_data_num <= test_train_num成立
     parser.add_argument('--selected_data_num', type=int, default=5)
 
+    parser.add_argument('--run_select_from_train', action='store_true')
+    parser.add_argument('--random_select', action='store_true')
+
     parser.add_argument('--get_grads_from', type=str, default="test", help="options:[test, val]")
     parser.add_argument('--adapted_degree', type=str, default="small", help="options:[small, large]")
 
@@ -227,8 +230,13 @@ def main():
             
             if args.run_select_with_distance:
                 # 只对最后的全连接层projection层进行fine-tuning
-                print('>>>>>>>my testing with test-time training : {}<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<'.format(setting))
+                print('>>>>>>> run_select_with_distance : {}<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<'.format(setting))
                 exp.select_with_distance(setting, test=1, is_training_part_params=True, use_adapted_model=True, test_train_epochs=args.test_train_epochs)
+
+            if args.run_select_from_train:
+                # 只对最后的全连接层projection层进行fine-tuning
+                print('>>>>>>> run_select_from_train : {}<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<'.format(setting))
+                exp.select_from_train(setting, test=1, is_training_part_params=True, use_adapted_model=True, test_train_epochs=args.test_train_epochs)
 
             if args.run_get_grads:
                 print('>>>>>>>get grads : {}<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<'.format(setting))
