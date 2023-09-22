@@ -286,7 +286,7 @@ class Dataset_Custom(Dataset):
 
     def inverse_transform(self, data):
         return self.scaler.inverse_transform(data)
-    
+
 
 class Dataset_Pred(Dataset):
     def __init__(self, root_path, flag='pred', size=None,
@@ -392,6 +392,7 @@ class Dataset_Pred(Dataset):
 
     def inverse_transform(self, data):
         return self.scaler.inverse_transform(data)
+
 
 
 

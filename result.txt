@@ -2680,3 +2680,30 @@ mse:0.6110605597496033, mae:0.3935585916042328
 traffic_96_96_Autoformer_custom_ftM_sl96_ll48_pl96_dm512_nh8_el2_dl1_df2048_fc3_ebtimeF_dtTrue_Exp_0  
 mse:0.6110605597496033, mae:0.3935585916042328
 
+ETTh1_96_96_Autoformer_ETTh1_ftM_sl96_ll48_pl96_dm512_nh8_el2_dl1_df2048_fc3_ebtimeF_dtTrue_Exp_0  
+mse:0.44920456409454346, mae:0.457561731338501
+
+ili_36_24_Autoformer_custom_ftM_sl36_ll18_pl24_dm512_nh8_el2_dl1_df2048_fc3_ebtimeF_dtTrue_Exp_0  
+mse:3.314236640930176, mae:1.2629777193069458
+
+ili_36_24_Autoformer_custom_ftM_sl36_ll18_pl60_dm512_nh8_el2_dl1_df2048_fc3_ebtimeF_dtTrue_Exp_0  
+mse:2.8607823848724365, mae:1.1413925886154175
+
+ili_36_24_Autoformer_custom_ftM_sl36_ll18_pl24_dm512_nh8_el2_dl1_df2048_fc3_ebtimeF_dtTrue_Exp_0  
+mse:3.314236640930176, mae:1.2629777193069458
+
+ili_36_24_Autoformer_custom_ftM_sl36_ll18_pl24_dm512_nh8_el2_dl1_df2048_fc3_ebtimeF_dtTrue_Exp_0  
+mse:3.314236640930176, mae:1.2629777193069458
+
+ili_36_24_Autoformer_custom_ftM_sl36_ll18_pl24_dm512_nh8_el2_dl1_df2048_fc3_ebtimeF_dtTrue_Exp_0  
+mse:3.314236640930176, mae:1.2629777193069458
+
+ili_36_24_Autoformer_custom_ftM_sl36_ll18_pl24_dm512_nh8_el2_dl1_df2048_fc3_ebtimeF_dtTrue_Exp_0  
+mse:3.314236640930176, mae:1.2629777193069458
+
+ili_36_24_Autoformer_custom_ftM_sl36_ll18_pl24_dm512_nh8_el2_dl1_df2048_fc3_ebtimeF_dtTrue_Exp_0  
+mse:3.314236640930176, mae:1.2629777193069458
+
+ili_36_24_Autoformer_custom_ftM_sl36_ll18_pl24_dm512_nh8_el2_dl1_df2048_fc3_ebtimeF_dtTrue_Exp_0  
+mse:3.314236640930176, mae:1.2629777193069458
+

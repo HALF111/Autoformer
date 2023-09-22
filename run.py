@@ -38,6 +38,7 @@ def main():
     parser.add_argument('--pred_len', type=int, default=96, help='prediction sequence length')
 
     # model define
+    # Autoformer
     parser.add_argument('--bucket_size', type=int, default=4, help='for Reformer')
     parser.add_argument('--n_hashes', type=int, default=4, help='for Reformer')
     parser.add_argument('--enc_in', type=int, default=7, help='encoder input size')
@@ -59,6 +60,14 @@ def main():
     parser.add_argument('--activation', type=str, default='gelu', help='activation')
     parser.add_argument('--output_attention', action='store_true', help='whether to output attention in encoder')
     parser.add_argument('--do_predict', action='store_true', help='whether to predict unseen future data')
+    # ETSformer
+    parser.add_argument('--K', type=int, default=1, help='Top-K Fourier bases')
+    parser.add_argument('--min_lr', type=float, default=1e-30)
+    parser.add_argument('--warmup_epochs', type=int, default=3)
+    parser.add_argument('--std', type=float, default=0.2)
+    parser.add_argument('--smoothing_learning_rate', type=float, default=0, help='optimizer learning rate')
+    parser.add_argument('--damping_learning_rate', type=float, default=0, help='optimizer learning rate')
+    parser.add_argument('--optim', type=str, default='adam', help='optimizer')
 
     # optimization
     parser.add_argument('--num_workers', type=int, default=10, help='data loader num workers')
@@ -230,7 +239,28 @@ def main():
             if args.run_select_with_distance:
                 # 只对最后的全连接层projection层进行fine-tuning
                 print('>>>>>>>my testing with test-time training : {}<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<'.format(setting))
-                exp.select_with_distance(setting, test=1, is_training_part_params=True, use_adapted_model=True, test_train_epochs=args.test_train_epochs)
+                a1, a2, a3, a4 = exp.select_with_distance(setting, test=1, is_training_part_params=True, use_adapted_model=True, test_train_epochs=args.test_train_epochs)
+                
+                result_dir = "./error_by_time"
+                if not os.path.exists(result_dir):
+                    os.makedirs(result_dir)
+                
+                dataset_name = args.data_path.replace(".csv", "")
+                # 1.before_adapt
+                file_name = f"{result_dir}/{dataset_name}_before_adapt.txt"
+                with open(file_name, "w") as f:
+                    for i in range(len(a1)):
+                        f.write(f"{a1[i]}\n")
+                # 2.adapting
+                file_name = f"{result_dir}/{dataset_name}_adapting.txt"
+                with open(file_name, "w") as f:
+                    for i in range(len(a2)):
+                        f.write(f"{a2[i]}\n")
+                # 3.after_adapt
+                file_name = f"{result_dir}/{dataset_name}_after_adapt.txt"
+                with open(file_name, "w") as f:
+                    for i in range(len(a4)):
+                        f.write(f"{a4[i]}\n")
 
             if args.run_get_grads:
                 print('>>>>>>>get grads : {}<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<'.format(setting))

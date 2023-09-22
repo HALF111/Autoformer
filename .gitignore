@@ -139,7 +139,7 @@ dmypy.json
 *.npz
 *.npy
 
-/.tune
+# /.tune
 # *.png
 # *.pdf
 

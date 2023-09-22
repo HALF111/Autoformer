@@ -1,10 +1,12 @@
 from data_provider.data_factory import data_provider
 from exp.exp_basic import Exp_Basic
 from models import Informer, Autoformer, Transformer, Reformer, Autoformer_extend
+# from models.etsformer import ETSformer
 from utils.tools import EarlyStopping, adjust_learning_rate, visual
 from utils.metrics import metric
 
 import numpy as np
+import matplotlib.pyplot as plt
 import torch
 import torch.nn as nn
 from torch import optim
@@ -14,10 +16,7 @@ from torch import optim
 
 import os
 import time
-
 import warnings
-import matplotlib.pyplot as plt
-import numpy as np
 
 # 后加的import内容
 import copy
@@ -204,6 +203,7 @@ class Exp_Main_Test(Exp_Basic):
                     f_dim = -1 if self.args.features == 'MS' else 0
                     outputs = outputs[:, -self.args.pred_len:, f_dim:]
                     batch_y = batch_y[:, -self.args.pred_len:, f_dim:].to(self.device)
+                    
                     loss = criterion(outputs, batch_y)
                     train_loss.append(loss.item())
 
@@ -297,7 +297,7 @@ class Exp_Main_Test(Exp_Basic):
                 f_dim = -1 if self.args.features == 'MS' else 0
                 outputs = outputs[:, -self.args.pred_len:, f_dim:]
                 batch_y = batch_y[:, -self.args.pred_len:, f_dim:].to(self.device)
-
+                
                 # selected_channels = self.selected_channels
                 if self.args.adapt_part_channels:
                     outputs = outputs[:, :, self.selected_channels]
@@ -711,6 +711,7 @@ class Exp_Main_Test(Exp_Basic):
             test_time_start = time.time()
             
             results = []
+            residuals = []
 
             self.model.eval()
             with torch.no_grad():
@@ -734,6 +735,9 @@ class Exp_Main_Test(Exp_Basic):
                     pred = pred.reshape(pred.shape[1], pred.shape[2])
                     true = true.detach().cpu().numpy()
                     true = true.reshape(true.shape[1], true.shape[2])
+                    
+                    residual = pred - true
+                    residuals.append(residual)
                     
                     mae, mse, rmse, mape, mspe = metric(pred, true)
                     # print('mse:{}, mae:{}'.format(mse, mae))
@@ -768,7 +772,9 @@ class Exp_Main_Test(Exp_Basic):
             if "train" in flag: file_flag = "train"
             elif "val" in flag: file_flag = "val"
             elif "test" in flag: file_flag = "test"
+            
             file_name = folder_path + f"pl{self.args.pred_len}_{file_flag}.txt"
+            residual_file_name = folder_path + f"residuals_pl{self.args.pred_len}_{file_flag}.npy"
             
             with open(file_name, "w") as f:
                 for result in results:
@@ -777,6 +783,9 @@ class Exp_Main_Test(Exp_Basic):
                         f.write(f"{item}, ")
                     f.write(f"{result[-1]}")
                     f.write("\n")
+            
+            residuals = np.array(residuals)
+            np.save(residual_file_name, residuals)
         
         return
             
@@ -937,6 +946,7 @@ class Exp_Main_Test(Exp_Basic):
 
     def select_with_distance(self, setting, test=0, is_training_part_params=True, use_adapted_model=True, test_train_epochs=1, weights_given=None, adapted_degree="small", weights_from="test"):
         test_data, test_loader = self._get_data_at_test_time(flag='test')
+        data_len = len(test_data)
         if test:
             print('loading model from checkpoint !!!')
             self.model.load_state_dict(torch.load(os.path.join('./checkpoints/' + setting, 'checkpoint.pth'), map_location='cuda:0'))
@@ -974,10 +984,17 @@ class Exp_Main_Test(Exp_Basic):
 
         # self.model.eval()
         for i, (batch_x, batch_y, batch_x_mark, batch_y_mark) in enumerate(test_loader):
+            # false:
+            # if data_len - i < self.args.batch_size: break
+            
+            # true:
+            # if data_len - i < data_len % self.args.batch_size: break
+            
             # 从self.model拷贝下来cur_model，并设置为train模式
             # self.model.load_state_dict(torch.load(os.path.join('./checkpoints/' + setting, 'checkpoint.pth'), map_location='cuda:0'))
             cur_model = copy.deepcopy(self.model)
-            cur_model.train()
+            # cur_model.train()
+            cur_model.eval()
 
             if is_training_part_params:
                 params = []
@@ -1012,7 +1029,7 @@ class Exp_Main_Test(Exp_Basic):
             
 
             # tmp loss
-            cur_model.eval()
+            # cur_model.eval()
             seq_len = self.args.seq_len
             pred_len = self.args.pred_len
             adapt_start_pos = self.args.adapt_start_pos
@@ -1030,9 +1047,7 @@ class Exp_Main_Test(Exp_Basic):
             # 获取adaptation之前的loss
             loss_before_adapt = criterion(pred, true)
             a1.append(loss_before_adapt.item())
-            # print(f"loss_before_adapt: {loss_before_adapt}")
-            # print(f'mse:{tmp_loss}')
-            cur_model.train()
+            # cur_model.train()
             
 
             # 先用原模型的预测值和标签值之间的error，做反向传播之后得到的梯度值gradient_0
@@ -1099,6 +1114,7 @@ class Exp_Main_Test(Exp_Basic):
                     # 为了计算当前的样本和测试样本间时间差是否是周期的倍数
                     # 我们先计算时间差与周期相除的余数
                     if 'illness' in self.args.data_path:
+                        import math
                         cycle_remainer = math.fmod(self.args.test_train_num-1 + self.args.pred_len - ii, self.period)
                     cycle_remainer = (self.args.test_train_num-1 + self.args.pred_len - ii) % self.period
                     # 定义判定的阈值
@@ -1283,7 +1299,6 @@ class Exp_Main_Test(Exp_Basic):
 
             cur_model.eval()
 
-
             seq_len = self.args.seq_len
             pred_len = self.args.pred_len
             adapt_start_pos = self.args.adapt_start_pos
@@ -1330,7 +1345,7 @@ class Exp_Main_Test(Exp_Basic):
                 error_per_pred_index[index].append(cur_error)
 
 
-            if (i+1) % 100 == 0:
+            if (i+1) % 100 == 0 or (data_len - i) < 100 and (i+1) % 10 == 0:
                 print("\titers: {0}, cost time: {1}s".format(i + 1, time.time() - test_time_start))
                 print(gradients)
                 tmp_p = np.array(preds); tmp_p = tmp_p.reshape(-1, tmp_p.shape[-2], tmp_p.shape[-1])
@@ -1350,7 +1365,7 @@ class Exp_Main_Test(Exp_Basic):
 
                 printed_selected_channels = [item+1 for item in self.selected_channels]
                 print(f"adapt_part_channels: {self.args.adapt_part_channels}, and adapt_cycle: {self.args.adapt_cycle}")
-                print(f"selected_channels: {printed_selected_channels[:25]}")
+                print(f"first 25th selected_channels: {printed_selected_channels[:25]}")
                 print(f"selected_distance_pairs are: {selected_distance_pairs}")
 
 
@@ -1432,7 +1447,7 @@ class Exp_Main_Test(Exp_Basic):
                     f.write(f"{all_distances[i][ii]}, ")
                 f.write(f"{a1[i]}, {a3[i]}" + "\n")
 
-        return a1, a2, a3
+        return a1, a2, a3, a4
 
 
     # def learn_mapping_model_during_vali(self, is_training_part_params):

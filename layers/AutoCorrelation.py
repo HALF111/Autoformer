@@ -159,6 +159,7 @@ class AutoCorrelationLayer(nn.Module):
             values,
             attn_mask
         )
-        out = out.view(B, L, -1)
 
+        out = out.view(B, L, -1)
+        
         return self.out_projection(out), attn
