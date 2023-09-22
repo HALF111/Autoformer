@@ -1,0 +1,30 @@
+{
+  "alpha": [
+    "INTEGER",
+    "0"
+  ],
+  "test_train_num": [
+    "INTEGER",
+    "10"
+  ],
+  "lambda_reg": [
+    "INTEGER",
+    "10000"
+  ],
+  "model": [
+    "TEXT",
+    "Autoformer"
+  ],
+  "dataset": [
+    "TEXT",
+    "ETTh1"
+  ],
+  "pred_len": [
+    "INTEGER",
+    "96"
+  ],
+  "gpu": [
+    "INTEGER",
+    "0"
+  ]
+}

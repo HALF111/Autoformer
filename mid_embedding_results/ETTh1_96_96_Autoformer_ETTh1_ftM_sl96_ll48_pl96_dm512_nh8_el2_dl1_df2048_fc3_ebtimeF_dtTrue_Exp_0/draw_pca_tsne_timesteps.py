@@ -6,6 +6,7 @@ from sklearn.cluster import KMeans
 from sklearn.manifold import TSNE
 from sklearn.decomposition import PCA
 import seaborn as sns
+import random
 
 pred_len = 96
 
@@ -80,23 +81,41 @@ print(train_res.shape, val_res.shape, test_res.shape)
 # print(SSE)
 
 
+# PCA或T-SNE降维
 n_clusters = 4
-res_dir = "./k_means_results/"
-label_file = res_dir + f"k={n_clusters}_labels.npy"
-Y = np.load(label_file)
-print(Y.shape)
+# res_dir = "./k_means_results/"
+# label_file = res_dir + f"k={n_clusters}_labels.npy"
+# Y = np.load(label_file)
+# print(Y.shape)
 
 X = train_res
 print(X.shape)
 
 # 核心方法：PCA或TSNE！！
-# pca = PCA(n_components=2)
-# X_pca = pca.fit_transform(X)
-tsne = TSNE(n_components=2)
-X_tsne = tsne.fit_transform(X)
-X_pca = X_tsne
+# * 下面的代码二选一注释掉
+pca = PCA(n_components=2)
+X_pca = pca.fit_transform(X)
+# tsne = TSNE(n_components=2)
+# X_tsne = tsne.fit_transform(X)
+# X_pca = X_tsne
 
 print(X_pca.shape)
+
+
+n_clusters = 12
+period = 24
+data_len = X_pca.shape[0]
+Y = np.zeros((data_len), dtype=int)
+for i in range(0, data_len, period//n_clusters):
+    Y[i] = i % period
+    for k in range(1, period//n_clusters):
+        if i+k >= data_len: break
+        Y[i+k] = Y[i]
+    # i += period//n_clusters - 1
+print(Y.shape)
+print(Y[:30])
+print(Y[-30:])
+
 
 X_pca = np.vstack((X_pca.T, Y)).T
 print(X_pca.shape)
@@ -107,12 +126,25 @@ df_pca = pd.DataFrame(X_pca, columns=["dim_1", "dim_2", "label"])
 print(df_pca.head())
 
 plt.figure()
-sns.scatterplot(data=df_pca, hue='label', x='dim_1', y='dim_2')
+# sns.scatterplot(data=df_pca, hue='label', x='dim_1', y='dim_2')
 # for i in range(n_clusters):
 #     tmp_df = df_pca.loc[df_pca['label'] == i, ["dim_1", "dim_2"]]
 #     plt.scatter(tmp_df["dim_1"], tmp_df["dim_2"])
-# plt.legend()
-plt.savefig(f"k={n_clusters}_tnse.pdf")
-
-
-
+# for i in range(0, period, period//n_clusters):
+#     print(i)
+#     tmp_df = df_pca.loc[df_pca['label'] == i, ["dim_1", "dim_2"]]
+#     plt.scatter(tmp_df["dim_1"], tmp_df["dim_2"], s=15)
+timesteps = list(range(data_len))
+shuffle = True
+if shuffle:
+    random.shuffle(timesteps)
+    df_pca_new_dim1 = df_pca.loc[timesteps, "dim_1"]
+    df_pca_new_dim2 = df_pca.loc[timesteps, "dim_2"]
+    plt.scatter(df_pca_new_dim1, df_pca_new_dim2, s=10, c=timesteps)
+    # for i in timesteps:
+    #     plt.scatter(df_pca["dim_1"][i], df_pca["dim_2"][i], s=10, c=timesteps[i])
+else:
+    plt.scatter(df_pca["dim_1"], df_pca["dim_2"], s=10, c=timesteps)
+plt.legend()
+plt.savefig(f"period{period}_timesteps_pca_random.pdf")
+# plt.savefig(f"period{period}_timesteps_tsne.pdf")

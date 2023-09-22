@@ -138,6 +138,7 @@ dmypy.json
 
 *.npz
 *.npy
+*.pth
 
 # /.tune
 # *.png

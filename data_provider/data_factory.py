@@ -11,7 +11,7 @@ data_dict = {
 }
 
 
-def data_provider(args, flag):
+def data_provider(args, flag, batch=None):
     Data = data_dict[args.data]
     timeenc = 0 if args.embed != 'timeF' else 1
 
@@ -37,7 +37,8 @@ def data_provider(args, flag):
         flag = "train"
         shuffle_flag = False  # 为了做KNN的时候保持训练集中顺序，故而设成False
         drop_last = True  # 设置成True还是False？
-        batch_size = args.batch_size
+        # batch_size = args.batch_size
+        batch_size = batch if batch else args.batch_size
         freq=args.freq
     elif flag == "val_without_shuffle":
         flag = "val"
@@ -102,6 +103,13 @@ def data_provider_at_test_time(args, flag):
         # 注意：因为我们要做TTT/TTA，所以一定要把batch_size设置成1 ！！！
         batch_size = args.adapted_batch_size
         # batch_size = 32
+    elif flag == "train":
+        shuffle_flag = False
+        # drop_last = False
+        drop_last = True
+        freq = args.freq
+        batch_size = args.adapted_batch_size
+
 
     # 再多一个use_nearest_data参数
     use_nearest_data = args.use_nearest_data
